@@ -3,160 +3,507 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Fresh Nest - Admin</title>
-    <!-- Load Tailwind CSS -->
+    <title>Fresh Nest Manager</title>
     <script src="https://cdn.tailwindcss.com"></script>
-    <!-- Load Firebase libraries -->
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
+    <style>
+        body {
+            font-family: 'Inter', sans-serif;
+            background-color: #f7fafc; /* Lighter gray background */
+        }
+        /* Custom scrollbar for better aesthetics */
+        ::-webkit-scrollbar {
+            width: 8px;
+        }
+        ::-webkit-scrollbar-thumb {
+            background: #cbd5e0; /* gray-400 */
+            border-radius: 10px;
+        }
+        ::-webkit-scrollbar-thumb:hover {
+            background: #a0aec0; /* gray-500 */
+        }
+        /* Hide number input arrows */
+        input[type=number]::-webkit-inner-spin-button,
+        input[type=number]::-webkit-outer-spin-button {
+            -webkit-appearance: none;
+            margin: 0;
+        }
+        input[type=number] {
+            -moz-appearance: textfield;
+        }
+        /* Active Nav Tab */
+        .nav-btn.active {
+            background-color: #ecfdf5; /* green-50 */
+            color: #065f46; /* green-800 */
+            border-left: 4px solid #059669; /* green-600 */
+        }
+    </style>
+</head>
+<body class="bg-gray-100">
+
+    <!-- Loading Spinner (Hidden by default) -->
+    <div id="loading-spinner" class="hidden fixed inset-0 bg-white bg-opacity-75 flex items-center justify-center z-50">
+        <svg class="animate-spin h-10 w-10 text-emerald-600" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
+            <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle>
+            <path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
+        </svg>
+    </div>
+
+    <!-- Message Modal (Hidden by default) -->
+    <div id="message-modal" class="hidden fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-40 p-4">
+        <div class="bg-white p-6 rounded-lg shadow-xl max-w-sm w-full text-center">
+            <p id="modal-message-text" class="text-lg font-medium text-gray-800"></p>
+            <button id="modal-close-btn" class="mt-4 bg-emerald-600 text-white font-bold py-2 px-6 rounded-lg shadow-md hover:bg-emerald-700 transition-colors">
+                OK
+            </button>
+        </div>
+    </div>
+    
+    <!-- Login Screen (Visible by default) -->
+    <div id="login-section" class="min-h-screen flex items-center justify-center bg-gray-50 py-12 px-4 sm:px-6 lg:px-8">
+        <div class="max-w-md w-full space-y-6 bg-white p-8 rounded-lg shadow-lg text-center">
+            <div>
+                <svg class="mx-auto h-12 w-auto text-emerald-600" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor">
+                    <path stroke-linecap="round" stroke-linejoin="round" d="M8.25 21v-4.875c0-.621.504-1.125 1.125-1.125h2.25c.621 0 1.125.504 1.125 1.125V21m0 0h4.5V3.545M12.75 21h7.5V10.75M12.75 21h-7.5a.75.75 0 0 1-.75-.75V8.625c0-.621.504-1.125 1.125-1.125h2.25c.621 0 1.125.504 1.125 1.125V21" />
+                </svg>
+                <h2 class="mt-4 text-3xl font-bold text-gray-900">
+                    Fresh Nest Manager
+                </h2>
+                <p class="mt-2 text-sm text-gray-600">
+                    Sign in to continue
+                </p>
+            </div>
+            
+            <button id="google-login-btn" class="w-full flex justify-center items-center gap-3 bg-emerald-600 text-white font-bold py-3 px-4 rounded-lg shadow-md hover:bg-emerald-700 transition-colors">
+                <svg class="w-5 h-5" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 488 512" fill="currentColor">
+                    <path d="M488 261.8C488 403.3 381.5 512 244 512 111.8 512 0 400.2 0 261.8 0 123.3 111.8 11.8 244 11.8 300.9 11.8 349.8 31.2 388.3 66.5L336.4 118.4C316.5 99.8 285.1 81.3 244 81.3 156.4 81.3 87 150.1 87 237.4c0 87.2 69.4 156.1 157 156.1 91.8 0 138.2-62.2 142.9-92.4H244V271.3h239.3c5.1 27.2 7.7 56.4 7.7 85.5z"/>
+                </svg>
+                <span>Sign in with Google</span>
+            </button>
+
+            <!-- Divider -->
+            <div class="my-4 flex items-center justify-center">
+                <span class="border-b w-1/4"></span>
+                <span class="px-2 text-xs uppercase text-gray-500">Or</span>
+                <span class="border-b w-1/4"></span>
+            </div>
+
+            <!-- New SysAdmin Login Form -->
+            <form id="admin-login-form" class="space-y-3">
+                <div>
+                    <label for="admin-pass" class="block text-sm font-medium text-gray-700 text-left">SysAdmin Login</label>
+                    <input type="password" id="admin-pass" name="adminPass" placeholder="Enter password" class="mt-1 block w-full p-2 border border-gray-300 rounded-md shadow-sm focus:ring-emerald-500 focus:border-emerald-500">
+                </div>
+                <button type="submit" class="w-full bg-gray-700 text-white font-bold py-2 px-4 rounded-lg shadow-md hover:bg-gray-800 transition-colors">
+                    Login
+                </button>
+            </form>
+
+        </div>
+    </div>
+
+
+    <!-- Main App Container (Hidden by default) -->
+    <div id="app-container" class="hidden max-w-7xl mx-auto">
+
+        <!-- Header -->
+        <header class="bg-white shadow-md p-4 flex justify-between items-center sticky top-0 z-10">
+            <div class="flex items-center gap-3">
+                <svg class="h-8 w-auto text-emerald-600" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor">
+                    <path stroke-linecap="round" stroke-linejoin="round" d="M8.25 21v-4.875c0-.621.504-1.125 1.125-1.125h2.25c.621 0 1.125.504 1.125 1.125V21m0 0h4.5V3.545M12.75 21h7.5V10.75M12.75 21h-7.5a.75.75 0 0 1-.75-.75V8.625c0-.621.504-1.125 1.125-1.125h2.25c.621 0 1.125.504 1.125 1.125V21" />
+                </svg>
+                <h1 class="text-2xl font-bold text-gray-800">Fresh Nest Manager</h1>
+            </div>
+            <button id="logout-btn" class="text-sm font-medium text-gray-600 hover:text-emerald-700">
+                Logout
+            </button>
+        </header>
+
+        <!-- Main Content -->
+        <div class="flex">
+            <!-- Navigation Sidebar -->
+            <nav class="w-64 bg-white p-4 space-y-2 h-screen-minus-header sticky top-16">
+                <button id="jobs-nav-btn" class="nav-btn w-full text-left p-3 rounded-lg font-medium text-gray-700 hover:bg-gray-100 transition-colors flex items-center gap-3 active">
+                    <svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5" viewBox="0 0 20 20" fill="currentColor">
+                        <path fill-rule="evenodd" d="M6 2a2 2 0 00-2 2v12a2 2 0 002 2h8a2 2 0 002-2V4a2 2 0 00-2-2H6zm2 2a1 1 0 011 1v1a1 1 0 11-2 0V5a1 1 0 011-1zM6 8a1 1 0 011-1h6a1 1 0 110 2H7a1 1 0 01-1-1zm1 3a1 1 0 100 2h6a1 1 0 100-2H7z" clip-rule="evenodd" />
+                    </svg>
+                    Jobs
+                </button>
+                <button id="clients-nav-btn" class="nav-btn w-full text-left p-3 rounded-lg font-medium text-gray-700 hover:bg-gray-100 transition-colors flex items-center gap-3">
+                    <svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5" viewBox="0 0 20 20" fill="currentColor">
+                        <path d="M13 6a3 3 0 11-6 0 3 3 0 016 0zM18 8a2 2 0 11-4 0 2 2 0 014 0zM14 15a4 4 0 00-8 0v3h8v-3zM6 8a2 2 0 11-4 0 2 2 0 014 0zM16 18v-3a5.972 5.972 0 00-.75-2.906A3.005 3.005 0 0118 15v3h-2zM4 18v-3a5.972 5.972 0 00-.75-2.906A3.005 3.005 0 016 15v3H4z" />
+                    </svg>
+                    Clients
+                </button>
+                <button id="staff-nav-btn" class="nav-btn w-full text-left p-3 rounded-lg font-medium text-gray-700 hover:bg-gray-100 transition-colors flex items-center gap-3">
+                    <svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5" viewBox="0 0 20 20" fill="currentColor">
+                        <path fill-rule="evenodd" d="M10 9a3 3 0 100-6 3 3 0 000 6zm-7 9a7 7 0 1114 0H3z" clip-rule="evenodd" />
+                    </svg>
+                    Staff
+                </button>
+                <button id="timesheets-nav-btn" class="nav-btn w-full text-left p-3 rounded-lg font-medium text-gray-700 hover:bg-gray-100 transition-colors flex items-center gap-3">
+                     <svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5" viewBox="0 0 20 20" fill="currentColor">
+                        <path fill-rule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zm1-12a1 1 0 10-2 0v4a1 1 0 00.293.707l2.828 2.829a1 1 0 101.415-1.415L11 9.586V6z" clip-rule="evenodd" />
+                    </svg>
+                    Timesheets
+                </button>
+            </nav>
+
+            <!-- Main Content Area -->
+            <main class="flex-1 p-6 h-screen-minus-header overflow-y-auto">
+
+                <!-- ================== -->
+                <!-- === JOBS SECTION === -->
+                <!-- ================== -->
+                <section id="jobs-section">
+                    <!-- Add New Job Form -->
+                    <div class="bg-white p-5 rounded-lg shadow-lg mb-6">
+                        <h2 class="text-xl font-bold text-emerald-800 mb-4">Schedule a New Job</h2>
+                        <form id="add-job-form" class="space-y-4">
+                            <div class="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                                <div>
+                                    <label for="job-client" class="block text-sm font-medium text-gray-700">Client</label>
+                                    <select id="job-client" name="jobClient" class="mt-1 block w-full p-2 border border-gray-300 rounded-md shadow-sm focus:ring-emerald-500 focus:border-emerald-500">
+                                        <option value="">Loading clients...</option>
+                                    </select>
+                                </div>
+                                <div>
+                                    <label for="job-date" class="block text-sm font-medium text-gray-700">Job Date</label>
+                                    <input type="date" id="job-date" name="jobDate" class="mt-1 block w-full p-2 border border-gray-300 rounded-md shadow-sm focus:ring-emerald-500 focus:border-emerald-500">
+                                </div>
+                            </div>
+                            <div>
+                                <label for="job-staff" class="block text-sm font-medium text-gray-700">Assign Staff</label>
+                                <select id="job-staff" name="jobStaff" class="mt-1 block w-full p-2 border border-gray-300 rounded-md shadow-sm focus:ring-emerald-500 focus:border-emerald-500">
+                                    <option value="">Loading staff...</option>
+                                </select>
+                            </div>
+                            <button type="submit" class="w-full bg-emerald-600 text-white font-bold py-3 px-4 rounded-lg shadow-md hover:bg-emerald-700 transition-colors">
+                                Add Job
+                            </button>
+                        </form>
+                    </div>
+
+                    <!-- Upcoming Jobs List -->
+                    <div>
+                        <h2 class="text-2xl font-bold text-gray-800 mb-4">Upcoming Jobs</h2>
+                        <div id="jobs-list" class="space-y-3">
+                            <!-- Jobs will be injected here -->
+                        </div>
+                    </div>
+                </section>
+
+                <!-- ===================== -->
+                <!-- === CLIENTS SECTION === -->
+                <!-- ===================== -->
+                <section id="clients-section" class="hidden">
+                    <!-- Add New Client Form -->
+                    <div class="bg-white p-5 rounded-lg shadow-lg mb-6">
+                        <h2 class="text-xl font-bold text-emerald-800 mb-4">Add New Client</h2>
+                        <form id="add-client-form" class="space-y-4">
+                            <div>
+                                <label for="client-name" class="block text-sm font-medium text-gray-700">Client Name</label>
+                                <input type="text" id="client-name" name="clientName" placeholder="e.g., John Doe or Acme Inc." class="mt-1 block w-full p-2 border border-gray-300 rounded-md shadow-sm focus:ring-emerald-500 focus:border-emerald-500">
+                            </div>
+                            <div class="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                                <div>
+                                    <label for="client-phone" class="block text-sm font-medium text-gray-700">Phone</label>
+                                    <input type="tel" id="client-phone" name="clientPhone" placeholder="e.g., (555) 123-4567" class="mt-1 block w-full p-2 border border-gray-300 rounded-md shadow-sm focus:ring-emerald-500 focus:border-emerald-500">
+                                </div>
+                                <div>
+                                    <label for="client-type" class="block text-sm font-medium text-gray-700">Client Type</label>
+                                    <select id="client-type" name="clientType" class="mt-1 block w-full p-2 border border-gray-300 rounded-md shadow-sm focus:ring-emerald-500 focus:border-emerald-500">
+                                        <option value="residential">Residential</option>
+                                        <option value="commercial">Commercial</option>
+                                    </select>
+                                </div>
+                            </div>
+                            <div>
+                                <label for="client-address" class="block text-sm font-medium text-gray-700">Address</label>
+                                <input type="text" id="client-address" name="clientAddress" placeholder="e.g., 123 Main St, Anytown, USA" class="mt-1 block w-full p-2 border border-gray-300 rounded-md shadow-sm focus:ring-emerald-500 focus:border-emerald-500">
+                            </div>
+                            <button type="submit" class="w-full bg-emerald-600 text-white font-bold py-3 px-4 rounded-lg shadow-md hover:bg-emerald-700 transition-colors">
+                                Add Client
+                            </button>
+                        </form>
+                    </div>
+
+                    <!-- Client List -->
+                    <div>
+                        <h2 class="text-2xl font-bold text-gray-800 mb-4">Clients</h2>
+                        <div id="clients-list" class="space-y-3">
+                            <!-- Clients will be injected here -->
+                        </div>
+                    </div>
+                </section>
+
+                <!-- =================== -->
+                <!-- === STAFF SECTION === -->
+                <!-- =================== -->
+                <section id="staff-section" class="hidden">
+                    <!-- Add New Staff Form -->
+                    <div class="bg-white p-5 rounded-lg shadow-lg mb-6">
+                        <h2 class="text-xl font-bold text-emerald-800 mb-4">Add New Staff Member</h2>
+                        <form id="add-staff-form" class="space-y-4">
+                            <div class="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                                <div>
+                                    <label for="staff-name" class="block text-sm font-medium text-gray-700">Full Name</label>
+                                    <input type="text" id="staff-name" name="staffName" placeholder="e.g., Jane Smith" class="mt-1 block w-full p-2 border border-gray-300 rounded-md shadow-sm focus:ring-emerald-500 focus:border-emerald-500">
+                                </div>
+                                <div>
+                                    <label for="staff-type" class="block text-sm font-medium text-gray-700">Staff Role</label>
+                                    <select id="staff-type" name="staffType" class="mt-1 block w-full p-2 border border-gray-300 rounded-md shadow-sm focus:ring-emerald-500 focus:border-emerald-500">
+                                        <option value="">Select Role</option>
+                                        <option value="Owner">Owner</option>
+                                        <option value="Manager">Manager</option>
+                                        <option value="Team Leader">Team Leader</option>
+                                        <option value="Cleaner">Cleaner</option>
+                                        <option value="SysAdmin">SysAdmin</option>
+                                    </select>
+                                </div>
+                            </div>
+
+                            <div class="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                                <div>
+                                    <label for="staff-phone" class="block text-sm font-medium text-gray-700">Phone</label>
+                                    <input type="tel" id="staff-phone" name="staffPhone" placeholder="e.g., (555) 123-4567" class="mt-1 block w-full p-2 border border-gray-300 rounded-md shadow-sm focus:ring-emerald-500 focus:border-emerald-500">
+                                </div>
+                                <div>
+                                    <label for="staff-email" class="block text-sm font-medium text-gray-700">Email</label>
+                                    <input type="email" id="staff-email" name="staffEmail" placeholder="e.g., jane@freshnest.com" class="mt-1 block w-full p-2 border border-gray-300 rounded-md shadow-sm focus:ring-emerald-500 focus:border-emerald-500">
+                                </div>
+                            </div>
+                            
+                            <div>
+                                <label for="staff-address" class="block text-sm font-medium text-gray-700">Address</label>
+                                <input type="text" id="staff-address" name="staffAddress" placeholder="e.g., 456 Oak Ave" class="mt-1 block w-full p-2 border border-gray-300 rounded-md shadow-sm focus:ring-emerald-500 focus:border-emerald-500">
+                            </div>
+
+                            <div class="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                                <div>
+                                    <label for="staff-start-date" class="block text-sm font-medium text-gray-700">Start Date</label>
+                                    <input type="date" id="staff-start-date" name="staffStartDate" class="mt-1 block w-full p-2 border border-gray-300 rounded-md shadow-sm focus:ring-emerald-500 focus:border-emerald-500">
+                                </div>
+                                <div>
+                                    <label for="staff-pay-rate" class="block text-sm font-medium text-gray-700">Pay Rate (per hour)</label>
+                                    <input type="number" id="staff-pay-rate" name="staffPayRate" min="0" step="0.01" placeholder="e.g., 22.50" class="mt-1 block w-full p-2 border border-gray-300 rounded-md shadow-sm focus:ring-emerald-500 focus:border-emerald-500">
+                                </div>
+                            </div>
+
+                            <button type="submit" class="w-full bg-emerald-600 text-white font-bold py-3 px-4 rounded-lg shadow-md hover:bg-emerald-700 transition-colors">
+                                Add Staff
+                            </button>
+                        </form>
+                    </div>
+
+                    <!-- Staff List -->
+                    <div>
+                        <h2 class="text-2xl font-bold text-gray-800 mb-4">Staff</h2>
+                        <div id="staff-list" class="space-y-3">
+                            <!-- Staff will be injected here -->
+                        </div>
+                    </div>
+                </section>
+
+                <!-- ======================== -->
+                <!-- === TIMESHEETS SECTION === -->
+                <!-- ======================== -->
+                <section id="timesheets-section" class="hidden">
+                    <!-- Log Time Form -->
+                    <div class="bg-white p-5 rounded-lg shadow-lg mb-6">
+                        <h2 class="text-xl font-bold text-emerald-800 mb-4">Log Staff Hours</h2>
+                        <form id="add-time-form" class="space-y-4">
+                            <div class="grid grid-cols-1 sm:grid-cols-3 gap-4">
+                                <div>
+                                    <label for="time-staff" class="block text-sm font-medium text-gray-700">Staff Member</label>
+                                    <select id="time-staff" name="timeStaff" class="mt-1 block w-full p-2 border border-gray-300 rounded-md shadow-sm focus:ring-emerald-500 focus:border-emerald-500">
+                                        <option value="">Loading staff...</option>
+                                    </select>
+                                </div>
+                                <div>
+                                    <label for="time-date" class="block text-sm font-medium text-gray-700">Date</label>
+                                    <input type="date" id="time-date" name="timeDate" class="mt-1 block w-full p-2 border border-gray-300 rounded-md shadow-sm focus:ring-emerald-500 focus:border-emerald-500">
+                                </div>
+                                <div>
+                                    <label for="time-hours" class="block text-sm font-medium text-gray-700">Hours Worked</label>
+                                    <input type="number" id="time-hours" name="timeHours" min="0" step="0.25" placeholder="e.g., 8.5" class="mt-1 block w-full p-2 border border-gray-300 rounded-md shadow-sm focus:ring-emerald-500 focus:border-emerald-500">
+                                </div>
+                            </div>
+                            <button type="submit" class="w-full bg-emerald-600 text-white font-bold py-3 px-4 rounded-lg shadow-md hover:bg-emerald-700 transition-colors">
+                                Log Hours
+                            </button>
+                        </form>
+                    </div>
+
+                    <!-- Timesheet "Spreadsheet" -->
+                    <div>
+                        <h2 class="text-2xl font-bold text-gray-800 mb-4">Logged Timesheets</h2>
+                        <div class="bg-white shadow-lg rounded-lg overflow-hidden">
+                            <table class="min-w-full divide-y divide-gray-200">
+                                <thead class="bg-gray-50">
+                                    <tr>
+                                        <th scope="col" class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Staff Name</th>
+                                        <th scope="col" class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Date</th>
+                                        <th scope="col" class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Hours</th>
+                                        <th scope="col" class="relative px-6 py-3">
+                                            <span class="sr-only">Delete</span>
+                                        </th>
+                                    </tr>
+                                </thead>
+                                <tbody id="timesheets-list" class="bg-white divide-y divide-gray-200">
+                                    <!-- Timesheet entries will be injected here -->
+                                </tbody>
+                            </table>
+                        </div>
+                    </div>
+                </section>
+            </main>
+        </div>
+    </div>
+
+    <!-- Firebase SDKs -->
     <script type="module">
-        // Firebase SDKs
+        // Import the functions you need from the SDKs you need
         import { initializeApp } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-app.js";
         import { 
             getAuth, 
-            onAuthStateChanged,
-            signInWithCustomToken,
-            GoogleAuthProvider, // New
-            signInWithPopup,    // New
-            signOut             // New
+            onAuthStateChanged, 
+            GoogleAuthProvider, 
+            signInWithPopup, 
+            signOut,
+            signInAnonymously // Import anonymous sign-in
         } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-auth.js";
         import { 
             getFirestore, 
-            doc, 
-            getDoc, 
-            setDoc, 
+            collection, 
             addDoc, 
-            updateDoc, 
+            doc, 
             deleteDoc, 
             onSnapshot, 
-            collection, 
-            query, 
-            where, 
-            getDocs,
+            query,
             setLogLevel
         } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-firestore.js";
 
-        // --- Firebase & App State ---
+        // --- Firebase Config ---
+        // This is the config you provided
+        const firebaseConfig = {
+            apiKey: "AIzaSyC0vpYDeCNk0wYddQadw3kkzCfiVQQv8Bk",
+            authDomain: "freshnest-aa51e.firebaseapp.com",
+            projectId: "freshnest-aa51e",
+            storageBucket: "freshnest-aa51e.firebasestorage.app",
+            messagingSenderId: "521227407391",
+            appId: "1:521227407391:web:c7d1886cf87a74434e452a",
+            measurementId: "G-NHB0PXTDLK"
+        };
+        
+        // --- App ID ---
+        const appId = typeof __app_id !== 'undefined' ? __app_id : 'default-app-id';
+
+        // --- Global App Variables ---
         let app, db, auth;
-        let userId;
+        let userId = null;
         let isAuthReady = false;
 
-        // Firestore unsubscribe functions
-        let clientsUnsubscribe = null;
-        let staffUnsubscribe = null;
-        let jobsUnsubscribe = null;
-        let timesheetsUnsubscribe = null;
+        // Firebase listeners (to detach later)
+        let unsubClients = () => {};
+        let unsubStaff = () => {};
+        let unsubJobs = () => {};
+        let unsubTimesheets = () => {};
 
-        // Local cache of data for populating dropdowns
-        let clientsCache = [];
-        let staffCache = [];
-
-        // Get App ID from environment
-        const appId = typeof __app_id !== 'undefined' ? __app_id : 'default-fresh-nest-app';
-        
-        // --- DOM Elements ---
-        let scheduleSection, clientsSection, staffSection, timesheetsSection;
-        let scheduleBtn, clientsBtn, staffBtn, timesheetsBtn;
+        // UI Element Globals
+        let navButtons, sections;
         let addJobForm, addClientForm, addStaffForm, addTimeForm;
         let jobsList, clientsList, staffList, timesheetsList;
         let jobClientSelect, jobStaffSelect, timeStaffSelect;
         let loadingSpinner, messageModal;
         
-        // New Auth UI Elements
-        let loginSection, mainAppContainer, googleLoginBtn, logoutBtn, adminLoginForm; // Added adminLoginForm
+        // Auth UI Elements
+        let loginSection, mainAppContainer, googleLoginBtn, logoutBtn, adminLoginForm;
 
         // --- Firebase Initialization ---
         async function initializeFirebase() {
             try {
-                // User-provided Firebase config
-                const firebaseConfig = {
-                  apiKey: "AIzaSyC0vpYDeCNk0wYddQadw3kkzCfiVQQv8Bk",
-                  authDomain: "freshnest-aa51e.firebaseapp.com",
-                  projectId: "freshnest-aa51e",
-                  storageBucket: "freshnest-aa51e.firebasestorage.app",
-                  messagingSenderId: "521227407391",
-                  appId: "1:521227407391:web:c7d1886cf87a74434e452a",
-                  measurementId: "G-NHB0PXTDLK"
-                };
-
                 app = initializeApp(firebaseConfig);
                 db = getFirestore(app);
                 auth = getAuth(app);
+                setLogLevel('Debug'); // Enable Firestore debug logging
                 
-                // Enable debug logging for Firestore
-                setLogLevel('Debug');
-
-                // Listen for auth state changes
-                onAuthStateChanged(auth, async (user) => {
+                // Set up the authentication state listener
+                onAuthStateChanged(auth, (user) => {
                     if (user) {
-                        // User is signed in (via Google, custom token, or session)
-                        console.log("User is signed in:", user.uid);
+                        // User is signed in
                         userId = user.uid;
+                        console.log("User signed in with UID:", userId);
                         isAuthReady = true;
                         
-                        // Attach listeners and show the app
+                        // Detach any old listeners and attach new ones for this user
+                        detachFirestoreListeners(); 
                         attachFirestoreListeners();
-                        showMainApp();
-
+                        
+                        showMainApp(); // Show the main app UI
                     } else {
-                        // User is not signed in
-                        console.log("User is not signed in. Checking for custom token...");
+                        // User is signed out
                         userId = null;
                         isAuthReady = false;
+                        console.log("User signed out.");
                         
-                        // Stop listening to any old data
-                        detachFirestoreListeners(); 
-
-                        // No user, so show the Google Login screen
-                        console.log("No custom token. Showing Google Login screen.");
-                        showLoginScreen();
+                        // Stop listening to data
+                        detachFirestoreListeners();
+                        
+                        showLoginScreen(); // Show the login screen
                     }
+                    hideLoading(); // Hide spinner after auth state is resolved
                 });
-            } catch (e) {
-                console.error("Error initializing Firebase:", e);
-                showMessage("Could not initialize app. Please check configuration.", "error");
-                showLoginScreen(); // Show login on init error
+
+            } catch (error) {
+                console.error("Firebase Init Error:", error);
+                showMessage("Could not initialize app. Please refresh.", "error");
             }
         }
 
-        // --- New Auth Functions ---
+        // --- Auth Functions ---
 
         async function handleGoogleLogin() {
+            if (!auth) return;
+            showLoading(); // Show spinner
             const provider = new GoogleAuthProvider();
             try {
-                showLoading(); // Show spinner during login
+                // This will trigger the onAuthStateChanged listener
                 await signInWithPopup(auth, provider);
-                // On success, onAuthStateChanged will fire and handle showing the app.
+                // On success, onAuthStateChanged handles showing the app
             } catch (error) {
-                console.error("Error during Google sign-in:", error);
-                showMessage("Could not sign in with Google. Please try again.", "error");
+                console.error("Google Login Error:", error);
+                showMessage("Could not login with Google, please try again", "error");
                 hideLoading(); // Hide spinner on error
             }
         }
 
-        // New function for SysAdmin login
+        // Updated function for SysAdmin login
         async function handleAdminLogin(e) {
             e.preventDefault();
-            if (!adminLoginForm) return; // Guard clause
+            if (!adminLoginForm || !auth) return; // Guard clause
             
             const pass = adminLoginForm.adminPass.value;
             
             if (pass === "Nest2012") {
-                // Password is correct. Bypass auth.
-                console.log("SysAdmin bypass successful.");
+                // Password is correct.
+                console.log("SysAdmin password correct. Attempting anonymous sign-in...");
                 showLoading();
                 
-                // Set a special, hardcoded userId for the SysAdmin
-                // All data will be saved/loaded from this user's "folder" in Firestore
-                userId = "SYS_ADMIN_BYPASS_USER_001"; 
-                isAuthReady = true;
-                
-                // Detach any potential old listeners (good practice)
-                detachFirestoreListeners(); 
-                
-                // Attach listeners with the new SysAdmin userId
-                attachFirestoreListeners(); 
-                
-                // Show the main app
-                showMainApp();
+                try {
+                    // Sign in anonymously. This WILL trigger onAuthStateChanged.
+                    // The 'userId' will be the anonymous user's UID.
+                    // All data will be saved under this UID, but it's a REAL auth session.
+                    await signInAnonymously(auth);
+                    
+                    // onAuthStateChanged will handle hiding the spinner and showing the app
+                    console.log("SysAdmin anonymous sign-in successful.");
+                    
+                } catch (error) {
+                    console.error("SysAdmin anonymous login error:", error);
+                    showMessage("Could not initialize admin session.", "error");
+                    hideLoading();
+                }
                 
             } else {
                 // Password is wrong
@@ -166,120 +513,141 @@
         }
 
         async function handleLogout() {
+            if (!auth) return;
+            showLoading();
             try {
                 await signOut(auth);
-                // On success, onAuthStateChanged will fire, detect no user,
-                // and call showLoginScreen().
+                // On success, onAuthStateChanged handles showing the login screen
             } catch (error) {
-                console.error("Error during sign-out:", error);
+                console.error("Logout Error:", error);
                 showMessage("Error signing out.", "error");
+                hideLoading();
             }
         }
+        
+        // --- UI State Functions ---
+        
+        function showMainApp() {
+            loginSection.classList.add('hidden');
+            mainAppContainer.classList.remove('hidden');
+            hideLoading();
+        }
 
-        // --- Attach/Detach Listeners ---
+        function showLoginScreen() {
+            loginSection.classList.remove('hidden');
+            mainAppContainer.classList.add('hidden');
+            hideLoading();
+        }
+
+        function showLoading() {
+            loadingSpinner.classList.remove('hidden');
+        }
+
+        function hideLoading() {
+            loadingSpinner.classList.add('hidden');
+        }
+
+        function showMessage(message, type = "info") {
+            const modalText = document.getElementById('modal-message-text');
+            modalText.textContent = message;
+            
+            // In a real app, you might change modal color based on 'type' (e.g., 'error', 'success')
+            
+            messageModal.classList.remove('hidden');
+        }
+
+        function hideMessage() {
+            messageModal.classList.add('hidden');
+        }
+
+        // --- Navigation ---
+        function handleNav(e) {
+            const targetId = e.currentTarget.id.replace('-nav-btn', '-section');
+
+            // Update button styles
+            navButtons.forEach(btn => {
+                btn.classList.toggle('active', btn.id === e.currentTarget.id);
+            });
+
+            // Show/hide content sections
+            sections.forEach(sec => {
+                sec.classList.toggle('hidden', sec.id !== targetId);
+            });
+        }
+
+        // --- Firestore Data Functions ---
 
         function attachFirestoreListeners() {
-            if (!isAuthReady || !userId) {
-                console.warn("Auth not ready or no user ID. Listeners not attached.");
+            if (!db || !userId) {
+                console.warn("Attempted to attach listeners without db or userId");
                 return;
             }
+            console.log(`Attaching listeners for user: ${userId}`);
 
-            // Ensure listeners aren't attached multiple times
-            if (clientsUnsubscribe) return;
-
-            console.log("Attaching Firestore listeners for user:", userId);
-
-            // 1. Listen for CLIENTS
-            const clientsRef = collection(db, 'artifacts', appId, 'users', userId, 'clients');
-            clientsUnsubscribe = onSnapshot(clientsRef, (snapshot) => {
+            // Clients
+            const clientsQuery = query(collection(db, 'artifacts', appId, 'users', userId, 'clients'));
+            unsubClients = onSnapshot(clientsQuery, (snapshot) => {
+                const clients = [];
+                snapshot.forEach(doc => clients.push({ id: doc.id, ...doc.data() }));
+                
+                // Clear and render list
                 clientsList.innerHTML = '';
-                jobClientSelect.innerHTML = '<option value="">Select a Client</option>';
-                clientsCache = []; // Clear cache
-                snapshot.docs.forEach(doc => {
-                    const client = { id: doc.id, ...doc.data() };
-                    clientsCache.push(client); // Add to cache
-                    renderClient(client);
-                    addClientToSelect(client);
-                });
+                clients.forEach(renderClient);
+
+                // Update select dropdowns
+                updateSelectOptions(jobClientSelect, clients, "Select Client");
             }, (error) => console.error("Error listening to clients:", error));
 
-            // 2. Listen for STAFF
-            const staffRef = collection(db, 'artifacts', appId, 'users', userId, 'staff');
-            staffUnsubscribe = onSnapshot(staffRef, (snapshot) => {
+            // Staff
+            const staffQuery = query(collection(db, 'artifacts', appId, 'users', userId, 'staff'));
+            unsubStaff = onSnapshot(staffQuery, (snapshot) => {
+                const staff = [];
+                snapshot.forEach(doc => staff.push({ id: doc.id, ...doc.data() }));
+                
+                // Clear and render list
                 staffList.innerHTML = '';
-                jobStaffSelect.innerHTML = '<option value="">Assign Staff</option>';
-                timeStaffSelect.innerHTML = '<option value="">Select Staff</option>';
-                staffCache = []; // Clear cache
-                snapshot.docs.forEach(doc => {
-                    const staff = { id: doc.id, ...doc.data() };
-                    staffCache.push(staff); // Add to cache
-                    renderStaff(staff);
-                    addStaffToSelect(staff);
-                    addStaffToTimeSelect(staff);
-                });
+                staff.forEach(renderStaff);
+                
+                // Update select dropdowns
+                updateSelectOptions(jobStaffSelect, staff, "Select Staff");
+                updateSelectOptions(timeStaffSelect, staff, "Select Staff");
             }, (error) => console.error("Error listening to staff:", error));
 
-            // 3. Listen for JOBS
-            const jobsRef = collection(db, 'artifacts', appId, 'users', userId, 'jobs');
-            jobsUnsubscribe = onSnapshot(jobsRef, (snapshot) => {
-                let jobs = [];
-                snapshot.docs.forEach(doc => {
-                    jobs.push({ id: doc.id, ...doc.data() });
-                });
+            // Jobs
+            const jobsQuery = query(collection(db, 'artifacts', appId, 'users', userId, 'jobs'));
+            unsubJobs = onSnapshot(jobsQuery, (snapshot) => {
+                const jobs = [];
+                snapshot.forEach(doc => jobs.push({ id: doc.id, ...doc.data() }));
                 
-                try {
-                    jobs.sort((a, b) => {
-                        const dateA = new Date(`${a.jobDate}T${a.jobTime || '00:00'}`);
-                        const dateB = new Date(`${b.jobDate}T${b.jobTime || '00:00'}`);
-                        return dateA - dateB;
-                    });
-                } catch (e) {
-                    console.error("Error sorting dates:", e);
-                }
-
+                // Clear and render list
                 jobsList.innerHTML = '';
-                jobs.forEach(job => renderJob(job));
+                jobs.forEach(renderJob);
             }, (error) => console.error("Error listening to jobs:", error));
 
-            // 4. Listen for TIMESHEETS
-            const timesheetsRef = collection(db, 'artifacts', appId, 'users', userId, 'timesheets');
-            timesheetsUnsubscribe = onSnapshot(timesheetsRef, (snapshot) => {
-                let entries = [];
-                snapshot.docs.forEach(doc => {
-                    entries.push({ id: doc.id, ...doc.data() });
-                });
+            // Timesheets
+            const timesheetsQuery = query(collection(db, 'artifacts', appId, 'users', userId, 'timesheets'));
+            unsubTimesheets = onSnapshot(timesheetsQuery, (snapshot) => {
+                const entries = [];
+                snapshot.forEach(doc => entries.push({ id: doc.id, ...doc.data() }));
+                
+                // Sort by date, most recent first
+                entries.sort((a, b) => new Date(b.date) - new Date(a.date));
 
-                entries.sort((a, b) => new Date(b.date) - new Date(a.date)); // Newest first
+                // Clear and render list
                 timesheetsList.innerHTML = '';
-                entries.forEach(entry => renderTimeEntry(entry));
-
+                entries.forEach(renderTimeEntry);
             }, (error) => console.error("Error listening to timesheets:", error));
         }
 
         function detachFirestoreListeners() {
             console.log("Detaching all Firestore listeners.");
-            if (clientsUnsubscribe) { clientsUnsubscribe(); clientsUnsubscribe = null; }
-            if (staffUnsubscribe) { staffUnsubscribe(); staffUnsubscribe = null; }
-            if (jobsUnsubscribe) { jobsUnsubscribe(); jobsUnsubscribe = null; }
-            if (timesheetsUnsubscribe) { timesheetsUnsubscribe(); timesheetsUnsubscribe = null; }
-
-            // Clear local caches
-            clientsCache = [];
-            staffCache = [];
-
-            // Clear UI lists
-            if (clientsList) clientsList.innerHTML = '';
-            if (staffList) staffList.innerHTML = '';
-            if (jobsList) jobsList.innerHTML = '';
-            if (timesheetsList) timesheetsList.innerHTML = '';
-            if (jobClientSelect) jobClientSelect.innerHTML = '<option value="">Select a Client</option>';
-            if (jobStaffSelect) jobStaffSelect.innerHTML = '<option value="">Assign Staff</option>';
-            if (timeStaffSelect) timeStaffSelect.innerHTML = '<option value="">Select Staff</option>';
+            unsubClients();
+            unsubStaff();
+            unsubJobs();
+            unsubTimesheets();
         }
 
-
-        // --- Render Functions (Unchanged) ---
-        // ... (All renderClient, renderStaff, renderJob, renderTimeEntry functions are identical) ...
+        // --- Render Functions ---
 
         function renderClient(client) {
             const el = document.createElement('div');
@@ -330,7 +698,7 @@
                     <p><strong>Email:</strong> ${staff.email || 'N/A'}</p>
                     <p><strong>Address:</strong> ${staff.address || 'N/A'}</p>
                     <p><strong>Start Date:</strong> ${staff.startDate ? new Date(staff.startDate + 'T00:00:00').toLocaleDateString() : 'N/A'}</p>
-                    <p><strong>Pay Rate:</strong> $${staff.payRate ? staff.payRate.toFixed(2) : '0.00'}/hr</p>
+                    <p><strong>Pay Rate:</strong> $${staff.payRate ? Number(staff.payRate).toFixed(2) : '0.00'}/hr</p>
                 </div>
             `;
             staffList.appendChild(el);
@@ -338,102 +706,85 @@
         }
 
         function renderJob(job) {
-            const client = clientsCache.find(c => c.id === job.clientId);
-            const staff = staffCache.find(s => s.id === job.staffId);
-            const clientName = client ? client.name : 'Unknown Client';
-            const staffName = staff ? staff.name : 'Unassigned';
-            const isCompleted = job.status === 'completed';
-            const jobDate = new Date(`${job.jobDate}T${job.jobTime || '00:00'}`);
+            const el = document.createElement('div');
+            el.className = 'bg-white p-4 rounded-lg shadow-md mb-3';
             
-            const formattedDate = jobDate.toLocaleDateString(undefined, {
-                weekday: 'short', month: 'short', day: 'numeric'
-            });
-            const formattedTime = jobDate.toLocaleTimeString(undefined, {
-                hour: '2-digit', minute: '2-digit'
+            // Format date for display
+            const jobDate = new Date(job.date + 'T00:00:00'); // Ensure it's treated as local date
+            const displayDate = jobDate.toLocaleDateString(undefined, {
+                weekday: 'long',
+                year: 'numeric',
+                month: 'long',
+                day: 'numeric'
             });
 
-            const el = document.createElement('div');
-            el.className = `bg-white p-4 rounded-lg shadow-md mb-3 border-l-4 ${isCompleted ? 'border-gray-400 opacity-70' : 'border-emerald-500'}`;
             el.innerHTML = `
                 <div class="flex justify-between items-start">
                     <div>
-                        <h4 class="font-bold text-lg ${isCompleted ? 'text-gray-600 line-through' : 'text-emerald-800'}">${clientName}</h4>
-                        <p class="text-sm text-gray-700">${job.serviceType}</p>
-                        <p class="text-sm text-gray-600 font-medium">${formattedDate} at ${formattedTime}</p>
-                        <p class="text-sm text-gray-600">with: ${staffName}</p>
+                        <h4 class="font-bold text-gray-800">${job.clientName}</h4>
+                        <p class="text-sm text-gray-600">Assigned to: ${job.staffName}</p>
                     </div>
+                    <span class="text-sm font-semibold text-emerald-800">${displayDate}</span>
+                </div>
+                <div class="text-right mt-2">
                     <button data-id="${job.id}" class="delete-job-btn text-red-500 hover:text-red-700 font-medium text-lg">
                         &times;
-                    </button>
-                </div>
-                <div class="mt-3 pt-3 border-t">
-                    <button data-id="${job.id}" data-status="${job.status}" class="toggle-job-status-btn w-full text-sm font-semibold py-2 px-3 rounded-lg ${isCompleted ? 'bg-gray-200 text-gray-700 hover:bg-gray-300' : 'bg-emerald-100 text-emerald-700 hover:bg-emerald-200'}">
-                        ${isCompleted ? 'Mark as Pending' : 'Mark as Completed'}
                     </button>
                 </div>
             `;
             jobsList.appendChild(el);
             el.querySelector('.delete-job-btn').addEventListener('click', () => deleteJob(job.id));
-            el.querySelector('.toggle-job-status-btn').addEventListener('click', () => toggleJobStatus(job.id, job.status));
         }
 
         function renderTimeEntry(entry) {
-            const staff = staffCache.find(s => s.id === entry.staffId);
-            const staffName = staff ? staff.name : 'Unknown Staff';
-            let displayDate = entry.date;
-            try {
-                const [year, month, day] = entry.date.split('-');
-                displayDate = new Date(year, month - 1, day).toLocaleDateString(undefined, {
-                    month: 'short',
-                    day: 'numeric',
-                    year: 'numeric'
-                });
-            } catch (e) {
-                console.warn("Could not parse date:", entry.date);
-            }
+            const el = document.createElement('tr');
+            
+            // Format date for display
+            const entryDate = new Date(entry.date + 'T00:00:00'); // Ensure local date
+            const displayDate = entryDate.toLocaleDateString();
 
-            const tr = document.createElement('tr');
-            tr.innerHTML = `
-                <td class="p-3 whitespace-nowrap text-sm text-gray-700">${staffName}</td>
-                <td class="p-3 whitespace-nowrap text-sm text-gray-700">${displayDate}</td>
-                <td class="p-3 whitespace-nowrap text-sm text-gray-700">${entry.hours}</td>
-                <td class="p-3 whitespace-nowrap text-sm text-gray-700">${entry.notes || ''}</td>
-                <td class="p-3 whitespace-nowrap text-sm text-right">
-                    <button data-id="${entry.id}" class="delete-time-btn text-red-500 hover:text-red-700">&times;</button>
+            el.innerHTML = `
+                <td class="px-6 py-4 whitespace-nowrap text-sm font-medium text-gray-900">${entry.staffName}</td>
+                <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-500">${displayDate}</td>
+                <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-500">${Number(entry.hours).toFixed(2)}</td>
+                <td class="px-6 py-4 whitespace-nowrap text-right text-sm font-medium">
+                    <button data-id="${entry.id}" class="delete-time-btn text-red-500 hover:text-red-700">
+                        Delete
+                    </button>
                 </td>
             `;
-            timesheetsList.appendChild(tr);
-            tr.querySelector('.delete-time-btn').addEventListener('click', () => deleteTimeEntry(entry.id));
+            timesheetsList.appendChild(el);
+            el.querySelector('.delete-time-btn').addEventListener('click', () => deleteTimeEntry(entry.id));
         }
 
-        // --- Helper functions (Unchanged) ---
-        // ... (addClientToSelect, addStaffToSelect, addStaffToTimeSelect are identical) ...
+        // --- Helper Functions ---
         
-        function addClientToSelect(client) {
-            const option = document.createElement('option');
-            option.value = client.id;
-            option.textContent = `${client.name} (${client.type})`;
-            jobClientSelect.appendChild(option);
+        function updateSelectOptions(selectElement, items, defaultOptionText) {
+            if (!selectElement) return;
+            
+            // Store current value
+            const currentValue = selectElement.value;
+            
+            // Clear all except the default
+            selectElement.innerHTML = `<option value="">${defaultOptionText}</option>`;
+            
+            // Add new options
+            items.forEach(item => {
+                const option = document.createElement('option');
+                option.value = item.id;
+                option.textContent = item.name;
+                // Add data attributes to store extra info
+                if (item.phone) option.dataset.phone = item.phone;
+                if (item.address) option.dataset.address = item.address;
+                
+                selectElement.appendChild(option);
+            });
+            
+            // Try to re-select the previous value
+            selectElement.value = currentValue;
         }
 
-        function addStaffToSelect(staff) {
-            const option = document.createElement('option');
-            option.value = staff.id;
-            option.textContent = staff.name;
-            jobStaffSelect.appendChild(option);
-        }
-
-        function addStaffToTimeSelect(staff) {
-            const option = document.createElement('option');
-            option.value = staff.id;
-            option.textContent = staff.name;
-            timeStaffSelect.appendChild(option);
-        }
-
-
-        // --- Firestore C(R)UD Functions (Unchanged, but now secure) ---
-        // ... (All handleAdd..., delete..., and toggle... functions are identical) ...
-        // ... (They inherently use the global `userId` which is now set by auth) ...
+        // --- Firestore "Add" Functions ---
 
         async function handleAddClient(e) {
             e.preventDefault();
@@ -442,15 +793,15 @@
             const phone = addClientForm.clientPhone.value;
             const address = addClientForm.clientAddress.value;
             const type = addClientForm.clientType.value;
-            if (!name || !phone || !address) return showMessage("Please fill out all client fields.", "error");
+            if (!name || !phone || !address) return showMessage("Please fill out all fields.", "error");
             try {
-                const clientsRef = collection(db, 'artifacts', appId, 'users', userId, 'clients');
-                await addDoc(clientsRef, { name, phone, address, type });
-                showMessage("Client added successfully!", "success");
+                const clientRef = collection(db, 'artifacts', appId, 'users', userId, 'clients');
+                await addDoc(clientRef, { name, phone, address, type });
+                showMessage("Client added!", "success");
                 addClientForm.reset();
             } catch (error) { console.error("Error adding client:", error); showMessage("Could not add client.", "error"); }
         }
-        
+
         async function handleAddStaff(e) {
             e.preventDefault();
             if (!userId) return showMessage("You must be logged in.", "error");
@@ -487,167 +838,88 @@
             e.preventDefault();
             if (!userId) return showMessage("You must be logged in.", "error");
             const clientId = addJobForm.jobClient.value;
-            const serviceType = addJobForm.jobService.value;
-            const jobDate = addJobForm.jobDate.value;
-            const jobTime = addJobForm.jobTime.value;
             const staffId = addJobForm.jobStaff.value;
-            if (!clientId || !serviceType || !jobDate || !jobTime || !staffId) return showMessage("Please fill out all job fields.", "error");
-            try {
-                const jobsRef = collection(db, 'artifacts', appId, 'users', userId, 'jobs');
-                await addDoc(jobsRef, { clientId, serviceType, jobDate, jobTime, staffId, status: 'pending' });
-                showMessage("Job booked successfully!", "success");
-                addJobForm.reset();
-            } catch (error) { console.error("Error adding job:", error); showMessage("Could not book job.", "error"); }
-        }
+            const date = addJobForm.jobDate.value;
+            if (!clientId || !staffId || !date) return showMessage("Please fill out all fields.", "error");
 
-        async function handleAddTimeEntry(e) {
+            const clientName = addJobForm.jobClient.options[addJobForm.jobClient.selectedIndex].text;
+            const staffName = addJobForm.jobStaff.options[addJobForm.jobStaff.selectedIndex].text;
+
+            try {
+                const jobRef = collection(db, 'artifacts', appId, 'users', userId, 'jobs');
+                await addDoc(jobRef, { clientId, clientName, staffId, staffName, date });
+                showMessage("Job added!", "success");
+                addJobForm.reset();
+            } catch (error) { console.error("Error adding job:", error); showMessage("Could not add job.", "error"); }
+        }
+        
+        async function handleAddTime(e) {
             e.preventDefault();
             if (!userId) return showMessage("You must be logged in.", "error");
             const staffId = addTimeForm.timeStaff.value;
             const date = addTimeForm.timeDate.value;
             const hours = parseFloat(addTimeForm.timeHours.value);
-            const notes = addTimeForm.timeNotes.value;
-            if (!staffId || !date || !hours) return showMessage("Please select staff, date, and hours.", "error");
-            if (isNaN(hours) || hours <= 0) return showMessage("Please enter valid hours.", "error");
+            if (!staffId || !date || !hours || hours <= 0) return showMessage("Please fill out all fields correctly.", "error");
+
+            const staffName = addTimeForm.timeStaff.options[addTimeForm.timeStaff.selectedIndex].text;
+
             try {
-                const timesheetsRef = collection(db, 'artifacts', appId, 'users', userId, 'timesheets');
-                await addDoc(timesheetsRef, { staffId, date, hours, notes });
-                showMessage("Time entry logged!", "success");
+                const timeRef = collection(db, 'artifacts', appId, 'users', userId, 'timesheets');
+                await addDoc(timeRef, { staffId, staffName, date, hours });
+                showMessage("Time logged!", "success");
                 addTimeForm.reset();
             } catch (error) { console.error("Error logging time:", error); showMessage("Could not log time.", "error"); }
         }
 
+        // --- Firestore "Delete" Functions ---
+        
         async function deleteClient(id) {
-            if (!userId) return;
+            if (!userId) return showMessage("You must be logged in.", "error");
             try {
-                const docRef = doc(db, 'artifacts', appId, 'users', userId, 'clients', id);
-                await deleteDoc(docRef);
+                await deleteDoc(doc(db, 'artifacts', appId, 'users', userId, 'clients', id));
                 showMessage("Client deleted.", "success");
             } catch (error) { console.error("Error deleting client:", error); showMessage("Could not delete client.", "error"); }
         }
         
         async function deleteStaff(id) {
-            if (!userId) return;
+            if (!userId) return showMessage("You must be logged in.", "error");
             try {
-                const docRef = doc(db, 'artifacts', appId, 'users', userId, 'staff', id);
-                await deleteDoc(docRef);
-                showMessage("Staff member deleted.", "success");
-            } catch (error) { console.error("Error deleting staff:", error); showMessage("Could not delete staff member.", "error"); }
+                await deleteDoc(doc(db, 'artifacts', appId, 'users', userId, 'staff', id));
+                showMessage("Staff deleted.", "success");
+            } catch (error) { console.error("Error deleting staff:", error); showMessage("Could not delete staff.", "error"); }
         }
-
+        
         async function deleteJob(id) {
-            if (!userId) return;
+            if (!userId) return showMessage("You must be logged in.", "error");
             try {
-                const docRef = doc(db, 'artifacts', appId, 'users', userId, 'jobs', id);
-                await deleteDoc(docRef);
+                await deleteDoc(doc(db, 'artifacts', appId, 'users', userId, 'jobs', id));
                 showMessage("Job deleted.", "success");
             } catch (error) { console.error("Error deleting job:", error); showMessage("Could not delete job.", "error"); }
         }
         
-        async function toggleJobStatus(id, currentStatus) {
-            if (!userId) return;
-            const newStatus = currentStatus === 'pending' ? 'completed' : 'pending';
-            try {
-                const docRef = doc(db, 'artifacts', appId, 'users', userId, 'jobs', id);
-                await updateDoc(docRef, { status: newStatus });
-                showMessage("Job status updated.", "success");
-            } catch (error) { console.error("Error updating job status:", error); showMessage("Could not update job status.", "error"); }
-        }
-
         async function deleteTimeEntry(id) {
-            if (!userId) return;
+            if (!userId) return showMessage("You must be logged in.",V", "error");
             try {
-                const docRef = doc(db, 'artifacts', appId, 'users', userId, 'timesheets', id);
-                await deleteDoc(docRef);
+                await deleteDoc(doc(db, 'artifacts', appId, 'users', userId, 'timesheets', id));
                 showMessage("Time entry deleted.", "success");
             } catch (error) { console.error("Error deleting time entry:", error); showMessage("Could not delete time entry.", "error"); }
         }
 
-
-        // --- UI Navigation ---
-        function showSection(sectionId) {
-            // Hide all sections
-            [scheduleSection, clientsSection, staffSection, timesheetsSection].forEach(sec => sec.classList.add('hidden'));
-            // Deactivate all buttons
-            [scheduleBtn, clientsBtn, staffBtn, timesheetsBtn].forEach(btn => btn.classList.remove('bg-emerald-600', 'text-white'));
-            
-            // Show target section and activate button
-            if (sectionId === 'schedule') {
-                scheduleSection.classList.remove('hidden');
-                scheduleBtn.classList.add('bg-emerald-600', 'text-white');
-            } else if (sectionId === 'clients') {
-                clientsSection.classList.remove('hidden');
-                clientsBtn.classList.add('bg-emerald-600', 'text-white');
-            } else if (sectionId === 'staff') {
-                staffSection.classList.remove('hidden');
-                staffBtn.classList.add('bg-emerald-600', 'text-white');
-            } else if (sectionId === 'timesheets') { 
-                timesheetsSection.classList.remove('hidden');
-                timesheetsBtn.classList.add('bg-emerald-600', 'text-white');
-            }
-        }
-
-        // --- UI Helpers ---
-        function showLoading() {
-            loadingSpinner.classList.remove('hidden');
-        }
-        
-        function hideLoading() {
-            loadingSpinner.classList.add('hidden');
-        }
-
-        // New UI state functions
-        function showMainApp() {
-            mainAppContainer.classList.remove('hidden');
-            loginSection.classList.add('hidden');
-            hideLoading();
-            showSection('schedule'); // Show default section
-        }
-        
-        function showLoginScreen() {
-            mainAppContainer.classList.add('hidden');
-            loginSection.classList.remove('hidden');
-            hideLoading();
-        }
-
-
-        function showMessage(message, type = 'success') {
-            messageModal.textContent = message;
-            if (type === 'error') {
-                messageModal.classList.remove('bg-green-500');
-                messageModal.classList.add('bg-red-500');
-            } else {
-                messageModal.classList.remove('bg-red-500');
-                messageModal.classList.add('bg-green-500');
-            }
-            messageModal.classList.remove('translate-y-full');
-            setTimeout(() => {
-                messageModal.classList.add('translate-y-full');
-            }, 3000);
-        }
-
         // --- DOMContentLoaded ---
         document.addEventListener('DOMContentLoaded', () => {
-            // Get main containers
+            // Get major containers
             loginSection = document.getElementById('login-section');
-            mainAppContainer = document.getElementById('main-app-container');
-
-            // Get section elements
-            scheduleSection = document.getElementById('schedule-section');
-            clientsSection = document.getElementById('clients-section');
-            staffSection = document.getElementById('staff-section');
-            timesheetsSection = document.getElementById('timesheets-section');
+            mainAppContainer = document.getElementById('app-container');
+            loadingSpinner = document.getElementById('loading-spinner');
             
-            // Get nav buttons
-            scheduleBtn = document.getElementById('schedule-btn');
-            clientsBtn = document.getElementById('clients-btn');
-            staffBtn = document.getElementById('staff-btn');
-            timesheetsBtn = document.getElementById('timesheets-btn');
-            logoutBtn = document.getElementById('logout-btn'); // New
+            // Get Message Modal
+            messageModal = document.getElementById('message-modal');
+            document.getElementById('modal-close-btn').addEventListener('click', hideMessage);
 
             // Get Auth buttons
-            googleLoginBtn = document.getElementById('google-login-btn'); // New
-            adminLoginForm = document.getElementById('admin-login-form'); // New
+            googleLoginBtn = document.getElementById('google-login-btn');
+            adminLoginForm = document.getElementById('admin-login-form');
+            logoutBtn = document.getElementById('logout-btn');
 
             // Get forms
             addJobForm = document.getElementById('add-job-form');
@@ -661,364 +933,37 @@
             staffList = document.getElementById('staff-list');
             timesheetsList = document.getElementById('timesheets-list');
 
-            // Get job form dropdowns
+            // Get select dropdowns
             jobClientSelect = document.getElementById('job-client');
             jobStaffSelect = document.getElementById('job-staff');
             timeStaffSelect = document.getElementById('time-staff');
 
-            // Get UI helpers
-            loadingSpinner = document.getElementById('loading-spinner');
-            messageModal = document.getElementById('message-modal');
+            // Get Nav buttons and Sections
+            navButtons = document.querySelectorAll('.nav-btn');
+            sections = document.querySelectorAll('main > section');
 
             // --- Attach Event Listeners ---
-
-            // Navigation
-            scheduleBtn.addEventListener('click', () => showSection('schedule'));
-            clientsBtn.addEventListener('click', () => showSection('clients'));
-            staffBtn.addEventListener('click', () => showSection('staff'));
-            timesheetsBtn.addEventListener('click', () => showSection('timesheets'));
+            
+            // Nav
+            navButtons.forEach(btn => btn.addEventListener('click', handleNav));
             
             // Auth
             googleLoginBtn.addEventListener('click', handleGoogleLogin);
-            adminLoginForm.addEventListener('submit', handleAdminLogin); // New
-            logoutBtn.addEventListener('click', handleLogout);
+            adminLoginForm.addEventListener('submit', handleAdminLogin);
+Nothing            logoutBtn.addEventListener('click', handleLogout);
             
             // Forms
             addJobForm.addEventListener('submit', handleAddJob);
             addClientForm.addEventListener('submit', handleAddClient);
             addStaffForm.addEventListener('submit', handleAddStaff);
-            addTimeForm.addEventListener('submit', handleAddTimeEntry);
+            addTimeForm.addEventListener('submit', handleAddTime);
 
-            // --- Initial State ---
-            showLoading(); // Show spinner until auth state is determined
+            // Start the app
+            showLoading(); // Show spinner on initial load
             initializeFirebase();
         });
 
     </script>
-</head>
-<body class="bg-gray-100 font-sans" style="font-family: 'Inter', sans-serif;">
-
-    <!-- ======================= -->
-    <!-- === LOGIN SECTION === -->
-    <!-- ======================= -->
-    <div id="login-section" class="hidden fixed inset-0 flex items-center justify-center bg-gray-100 z-30">
-        <div class="max-w-sm w-full bg-white p-8 rounded-lg shadow-xl text-center">
-            <h1 class="text-3xl font-bold text-emerald-600">Fresh Nest</h1>
-            <p class="text-gray-600 mb-8 mt-1">Cleaning Co. Management</p>
-            
-            <button id="google-login-btn" class="w-full bg-white border border-gray-300 text-gray-700 font-semibold py-3 px-4 rounded-lg shadow-sm hover:bg-gray-50 transition-colors flex items-center justify-center space-x-2">
-                <!-- Google SVG Icon -->
-                <svg class="w-5 h-5" viewBox="0 0 48 48" xmlns="http://www.w3.org/2000/svg">
-                    <path fill="#4285F4" d="M24 9.5c3.54 0 6.71 1.22 9.21 3.6l6.85-6.85C35.9 2.38 30.47 0 24 0 14.62 0 6.51 5.38 2.56 13.22l8.28 6.43A11.96 11.96 0 0 1 24 9.5z"/>
-                    <path fill="#34A853" d="M46.98 24.55c0-1.57-.15-3.09-.42-4.55H24v9.02h12.94c-.58 2.96-2.26 5.48-4.78 7.18l7.73 6c4.51-4.18 7.09-10.36 7.09-17.65z"/>
-                    <path fill="#FBBC05" d="M10.84 28.19A11.96 11.96 0 0 1 9.5 24c0-1.45.25-2.85.7-4.19l-8.28-6.43C.73 16.15 0 20 0 24s.73 7.85 1.96 11.19l8.88-7z"/>
-                    <path fill="#EA4335" d="M24 48c6.48 0 11.93-2.13 15.89-5.81l-7.73-6c-2.15 1.45-4.92 2.3-8.16 2.3-6.26 0-11.57-4.22-13.47-9.91l-8.28 6.43C6.51 42.62 14.62 48 24 48z"/>
-                    <path fill="none" d="M0 0h48v48H0z"/>
-                </svg>
-                <span>Sign in with Google</span>
-            </button>
-
-            <!-- Divider -->
-            <div class="my-4 flex items-center justify-center">
-                <span class="border-b w-1/4"></span>
-                <span class="px-2 text-xs uppercase text-gray-500">Or</span>
-                <span class="border-b w-1/4"></span>
-            </div>
-
-            <!-- New SysAdmin Login Form -->
-            <form id="admin-login-form" class="space-y-3">
-                <div>
-                    <label for="admin-pass" class="block text-sm font-medium text-gray-700 text-left">SysAdmin Login</label>
-                    <input type="password" id="admin-pass" name="adminPass" placeholder="Enter password" class="mt-1 block w-full p-2 border border-gray-300 rounded-md shadow-sm focus:ring-emerald-500 focus:border-emerald-500">
-                </div>
-                <button type="submit" class="w-full bg-gray-700 text-white font-bold py-2 px-4 rounded-lg shadow-md hover:bg-gray-800 transition-colors">
-                    Login
-                </button>
-            </form>
-
-        </div>
-    </div>
-
-
-    <!-- ======================== -->
-    <!-- === MAIN APP SECTION === -->
-    <!-- ======================== -->
-    <!-- Main Container (now hidden by default) -->
-    <div id="main-app-container" class="hidden max-w-3xl mx-auto min-h-screen bg-gray-100 pb-24">
-        
-        <!-- Header -->
-        <header class="bg-emerald-600 text-white p-5 shadow-lg relative">
-            <h1 class="text-3xl font-bold text-center">Fresh Nest</h1>
-            <p class="text-center text-emerald-100 text-sm">Cleaning Co. Management</p>
-            
-            <!-- Logout Button -->
-            <button id="logout-btn" class="absolute top-4 right-4 sm:top-5 sm:right-5 bg-white text-emerald-700 text-sm font-semibold px-3 py-1 rounded-md shadow hover:bg-emerald-50 transition-colors">
-                Logout
-            </button>
-        </header>
-
-        <!-- Navigation -->
-        <nav class="sticky top-0 z-10 bg-white shadow-md">
-            <div class="flex justify-around">
-                <button id="schedule-btn" class="flex-1 py-3 px-4 font-semibold text-emerald-700 hover:bg-emerald-50 transition-colors text-sm sm:text-base">
-                    Schedule
-                </button>
-                <button id="clients-btn" class="flex-1 py-3 px-4 font-semibold text-emerald-700 hover:bg-emerald-50 transition-colors border-l border-gray-200 text-sm sm:text-base">
-                    Clients
-                </button>
-                <button id="staff-btn" class="flex-1 py-3 px-4 font-semibold text-emerald-700 hover:bg-emerald-50 transition-colors border-l border-gray-200 text-sm sm:text-base">
-                    Staff
-                </button>
-                <button id="timesheets-btn" class="flex-1 py-3 px-4 font-semibold text-emerald-700 hover:bg-emerald-50 transition-colors border-l border-gray-200 text-sm sm:text-base">
-                    Timesheets
-                </button>
-            </div>
-        </nav>
-
-        <!-- Content Area -->
-        <main class="p-4">
-
-            <!-- ======================= -->
-            <!-- === SCHEDULE SECTION === -->
-            <!-- ======================= -->
-            <section id="schedule-section">
-                <!-- Book New Job Form -->
-                <div class="bg-white p-5 rounded-lg shadow-lg mb-6">
-                    <h2 class="text-xl font-bold text-emerald-800 mb-4">Book New Job</h2>
-                    <form id="add-job-form" class="space-y-4">
-                        <div>
-                            <label for="job-client" class="block text-sm font-medium text-gray-700">Client</label>
-                            <select id="job-client" name="jobClient" class="mt-1 block w-full p-2 border border-gray-300 rounded-md shadow-sm focus:ring-emerald-500 focus:border-emerald-500"></select>
-                        </div>
-                        
-                        <div>
-                            <label for="job-service" class="block text-sm font-medium text-gray-700">Service Type</label>
-                            <select id="job-service" name="jobService" class="mt-1 block w-full p-2 border border-gray-300 rounded-md shadow-sm focus:ring-emerald-500 focus:border-emerald-500">
-                                <option value="">Select Service</option>
-                                <option value="Residential - Standard">Residential - Standard</option>
-                                <option value="Residential - Deep Clean">Residential - Deep Clean</option>
-                                <option value="Residential - Move In/Out">Residential - Move In/Out</option>
-                                <option value="Commercial - Office">Commercial - Office</option>
-                                <option value="Commercial - Retail">Commercial - Retail</option>
-                            </select>
-                        </div>
-
-                        <div class="grid grid-cols-2 gap-4">
-                            <div>
-                                <label for="job-date" class="block text-sm font-medium text-gray-700">Date</label>
-                                <input type="date" id="job-date" name="jobDate" class="mt-1 block w-full p-2 border border-gray-300 rounded-md shadow-sm focus:ring-emerald-500 focus:border-emerald-500">
-                            </div>
-                            <div>
-                                <label for="job-time" class="block text-sm font-medium text-gray-700">Time</label>
-                                <input type="time" id="job-time" name="jobTime" class="mt-1 block w-full p-2 border border-gray-300 rounded-md shadow-sm focus:ring-emerald-500 focus:border-emerald-500">
-                            </div>
-                        </div>
-
-                        <div>
-                            <label for="job-staff" class="block text-sm font-medium text-gray-700">Assign Staff</label>
-                            <select id="job-staff" name="jobStaff" class="mt-1 block w-full p-2 border border-gray-300 rounded-md shadow-sm focus:ring-emerald-500 focus:border-emerald-500"></select>
-                        </div>
-
-                        <button type="submit" class="w-full bg-emerald-600 text-white font-bold py-3 px-4 rounded-lg shadow-md hover:bg-emerald-700 transition-colors">
-                            Book Job
-                        </button>
-                    </form>
-                </div>
-
-                <!-- Upcoming Jobs List -->
-                <div>
-                    <h2 class="text-xl font-bold text-emerald-800 mb-4">Upcoming Jobs</h2>
-                    <div id="jobs-list" class="space-y-3">
-                        <!-- Jobs will be rendered here by JS -->
-                    </div>
-                </div>
-            </section>
-
-            <!-- ===================== -->
-            <!-- === CLIENTS SECTION === -->
-            <!-- ===================== -->
-            <section id="clients-section" class="hidden">
-                <!-- Add New Client Form -->
-                <div class="bg-white p-5 rounded-lg shadow-lg mb-6">
-                    <h2 class="text-xl font-bold text-emerald-800 mb-4">Add New Client</h2>
-                    <form id="add-client-form" class="space-y-4">
-                        <div>
-                            <label for="client-name" class="block text-sm font-medium text-gray-700">Client Name</label>
-                            <input type="text" id="client-name" name="clientName" placeholder="e.g., John Doe" class="mt-1 block w-full p-2 border border-gray-300 rounded-md shadow-sm focus:ring-emerald-500 focus:border-emerald-500">
-                        </div>
-                        <div>
-                            <label for="client-phone" class="block text-sm font-medium text-gray-700">Phone</label>
-                            <input type="tel" id="client-phone" name="clientPhone" placeholder="e.g., (555) 123-4567" class="mt-1 block w-full p-2 border border-gray-300 rounded-md shadow-sm focus:ring-emerald-500 focus:border-emerald-500">
-                        </div>
-                        <div>
-                            <label for="client-address" class="block text-sm font-medium text-gray-700">Address</label>
-                            <input type="text" id="client-address" name="clientAddress" placeholder="e.g., 123 Main St" class="mt-1 block w-full p-2 border border-gray-300 rounded-md shadow-sm focus:ring-emerald-500 focus:border-emerald-500">
-                        </div>
-                        <div>
-                            <label for="client-type" class="block text-sm font-medium text-gray-700">Client Type</label>
-                            <select id="client-type" name="clientType" class="mt-1 block w-full p-2 border border-gray-300 rounded-md shadow-sm focus:ring-emerald-500 focus:border-emerald-500">
-                                <option value="residential">Residential</option>
-                                <option value="commercial">Commercial</option>
-                            </select>
-                        </div>
-                        <button type="submit" class="w-full bg-emerald-600 text-white font-bold py-3 px-4 rounded-lg shadow-md hover:bg-emerald-700 transition-colors">
-                            Add Client
-                        </button>
-                    </form>
-                </div>
-                
-                <!-- Client List -->
-                <div>
-                    <h2 class="text-xl font-bold text-emerald-800 mb-4">My Clients</h2>
-                    <div id="clients-list" class="space-y-3">
-                        <!-- Clients will be rendered here by JS -->
-                    </div>
-                </div>
-            </section>
-
-            <!-- =================== -->
-            <!-- === STAFF SECTION === -->
-            <!-- =================== -->
-            <section id="staff-section" class="hidden">
-                <!-- Add New Staff Form -->
-                <div class="bg-white p-5 rounded-lg shadow-lg mb-6">
-                    <h2 class="text-xl font-bold text-emerald-800 mb-4">Add New Staff Member</h2>
-                    <form id="add-staff-form" class="space-y-4">
-                        <div class="grid grid-cols-1 sm:grid-cols-2 gap-4">
-                            <div>
-                                <label for="staff-name" class="block text-sm font-medium text-gray-700">Full Name</label>
-                                <input type="text" id="staff-name" name="staffName" placeholder="e.g., Jane Smith" class="mt-1 block w-full p-2 border border-gray-300 rounded-md shadow-sm focus:ring-emerald-500 focus:border-emerald-500">
-                            </div>
-                            <div>
-                                <label for="staff-type" class="block text-sm font-medium text-gray-700">Staff Role</label>
-                                <select id="staff-type" name="staffType" class="mt-1 block w-full p-2 border border-gray-300 rounded-md shadow-sm focus:ring-emerald-500 focus:border-emerald-500">
-                                    <option value="">Select Role</option>
-                                    <option value="Owner">Owner</option>
-                                    <option value="Manager">Manager</option>
-                                    <option value="Team Leader">Team Leader</option>
-                                    <option value="Cleaner">Cleaner</option>
-                                    <option value="SysAdmin">SysAdmin</option>
-                                </select>
-                            </div>
-                        </div>
-
-                        <div class="grid grid-cols-1 sm:grid-cols-2 gap-4">
-                            <div>
-                                <label for="staff-phone" class="block text-sm font-medium text-gray-700">Phone</label>
-                                <input type="tel" id="staff-phone" name="staffPhone" placeholder="e.g., (555) 123-4567" class="mt-1 block w-full p-2 border border-gray-300 rounded-md shadow-sm focus:ring-emerald-500 focus:border-emerald-500">
-                            </div>
-                            <div>
-                                <label for="staff-email" class="block text-sm font-medium text-gray-700">Email</label>
-                                <input type="email" id="staff-email" name="staffEmail" placeholder="e.g., jane@freshnest.com" class="mt-1 block w-full p-2 border border-gray-300 rounded-md shadow-sm focus:ring-emerald-500 focus:border-emerald-500">
-                            </div>
-                        </div>
-                        
-                        <div>
-                            <label for="staff-address" class="block text-sm font-medium text-gray-700">Address</label>
-                            <input type="text" id="staff-address" name="staffAddress" placeholder="e.g., 456 Oak Ave" class="mt-1 block w-full p-2 border border-gray-300 rounded-md shadow-sm focus:ring-emerald-500 focus:border-emerald-500">
-                        </div>
-
-                        <div class="grid grid-cols-1 sm:grid-cols-2 gap-4">
-                            <div>
-                                <label for="staff-start-date" class="block text-sm font-medium text-gray-700">Start Date</label>
-                                <input type="date" id="staff-start-date" name="staffStartDate" class="mt-1 block w-full p-2 border border-gray-300 rounded-md shadow-sm focus:ring-emerald-500 focus:border-emerald-500">
-                            </div>
-                            <div>
-                                <label for="staff-pay-rate" class="block text-sm font-medium text-gray-700">Pay Rate (per hour)</label>
-                                <input type="number" id="staff-pay-rate" name="staffPayRate" min="0" step="0.01" placeholder="e.g., 22.50" class="mt-1 block w-full p-2 border border-gray-300 rounded-md shadow-sm focus:ring-emerald-500 focus:border-emerald-500">
-                            </div>
-                        </div>
-
-                        <button type="submit" class="w-full bg-emerald-600 text-white font-bold py-3 px-4 rounded-lg shadow-md hover:bg-emerald-700 transition-colors">
-                            Add Staff
-                        </button>
-                    </form>
-                </div>
-
-                <!-- Staff List -->
-                <div>
-                    <h2 class="text-xl font-bold text-emerald-800 mb-4">My Team</h2>
-                    <div id="staff-list" class="space-y-3">
-                        <!-- Staff will be rendered here by JS -->
-                    </div>
-                </div>
-            </section>
-
-            <!-- ========================= -->
-            <!-- === TIMESHEETS SECTION === -->
-            <!-- ========================= -->
-            <section id="timesheets-section" class="hidden">
-                <!-- Log Time Form -->
-                <div class="bg-white p-5 rounded-lg shadow-lg mb-6">
-                    <h2 class="text-xl font-bold text-emerald-800 mb-4">Log Staff Hours</h2>
-                    <form id="add-time-form" class="space-y-4">
-                        <div>
-                            <label for="time-staff" class="block text-sm font-medium text-gray-700">Staff Member</label>
-                            <select id="time-staff" name="timeStaff" class="mt-1 block w-full p-2 border border-gray-300 rounded-md shadow-sm focus:ring-emerald-500 focus:border-emerald-500"></select>
-                        </div>
-                        
-                        <div class="grid grid-cols-2 gap-4">
-                            <div>
-                                <label for="time-date" class="block text-sm font-medium text-gray-700">Date</label>
-                                <input type="date" id="time-date" name="timeDate" class="mt-1 block w-full p-2 border border-gray-300 rounded-md shadow-sm focus:ring-emerald-500 focus:border-emerald-500">
-                            </div>
-                            <div>
-                                <label for="time-hours" class="block text-sm font-medium text-gray-700">Hours</label>
-                                <input type="number" id="time-hours" name="timeHours" min="0" step="0.25" placeholder="e.g., 8.5" class="mt-1 block w-full p-2 border border-gray-300 rounded-md shadow-sm focus:ring-emerald-500 focus:border-emerald-500">
-                            </div>
-                        </div>
-
-                        <div>
-                            <label for="time-notes" class="block text-sm font-medium text-gray-700">Notes (Optional)</label>
-                            <input type="text" id="time-notes" name="timeNotes" placeholder="e.g., Deep clean at 123 Main" class="mt-1 block w-full p-2 border border-gray-300 rounded-md shadow-sm focus:ring-emerald-500 focus:border-emerald-500">
-                        </div>
-
-                        <button type="submit" class="w-full bg-emerald-600 text-white font-bold py-3 px-4 rounded-lg shadow-md hover:bg-emerald-700 transition-colors">
-                            Log Hours
-                        </button>
-                    </form>
-                </div>
-
-                <!-- Logged Hours List (Spreadsheet View) -->
-                <div>
-                    <h2 class="text-xl font-bold text-emerald-800 mb-4">Logged Hours</h2>
-                    <div class="overflow-x-auto shadow-md rounded-lg">
-                        <table class="min-w-full bg-white">
-                            <thead class="bg-gray-50">
-                                <tr>
-                                    <th scope="col" class="p-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Staff</th>
-                                    <th scope="col" class="p-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Date</th>
-                                    <th scope="col" class="p-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Hours</th>
-                                    <th scope="col" class="p-3 text-left text-xs font-m"text-gray-500 uppercase tracking-wider">Notes</th>
-                                    <th scope="col" class="p-3 text-right text-xs font-medium text-gray-500 uppercase tracking-wider">Action</th>
-                                </tr>
-                            </thead>
-                            <tbody id="timesheets-list" class="divide-y divide-gray-200">
-                                <!-- Timesheet entries will be rendered here by JS -->
-                            </tbody>
-                        </table>
-                    </div>
-                </div>
-            </section>
-        </main>
-    </div>
-
-    <!-- ================== -->
-    <!-- === UI HELPERS === -->
-    <!-- ================== -->
-    <!-- Loading Spinner (Visible by default, hidden by JS) -->
-    <div id="loading-spinner" class="fixed inset-0 bg-black bg-opacity-50 flex justify-center items-center z-50">
-        <div class="animate-spin rounded-full h-16 w-16 border-t-4 border-b-4 border-emerald-400"></div>
-    </div>
-    
-    <!-- Message Modal -->
-    <div id="message-modal" class="fixed bottom-0 left-0 right-0 p-4 text-white text-center transform translate-y-full transition-transform duration-300 z-40">
-        <!-- Message content set by JS -->
-    </div>
 </body>
 </html>
-
-
-
-
 
