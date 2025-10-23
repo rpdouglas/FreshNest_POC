@@ -61,7 +61,7 @@
         let loadingSpinner, messageModal;
         
         // New Auth UI Elements
-        let loginSection, mainAppContainer, googleLoginBtn, logoutBtn;
+        let loginSection, mainAppContainer, googleLoginBtn, logoutBtn, adminLoginForm; // Added adminLoginForm
 
         // --- Firebase Initialization ---
         async function initializeFirebase() {
@@ -129,6 +129,39 @@
                 console.error("Error during Google sign-in:", error);
                 showMessage("Could not sign in with Google. Please try again.", "error");
                 hideLoading(); // Hide spinner on error
+            }
+        }
+
+        // New function for SysAdmin login
+        async function handleAdminLogin(e) {
+            e.preventDefault();
+            if (!adminLoginForm) return; // Guard clause
+            
+            const pass = adminLoginForm.adminPass.value;
+            
+            if (pass === "Nest2012") {
+                // Password is correct. Bypass auth.
+                console.log("SysAdmin bypass successful.");
+                showLoading();
+                
+                // Set a special, hardcoded userId for the SysAdmin
+                // All data will be saved/loaded from this user's "folder" in Firestore
+                userId = "SYS_ADMIN_BYPASS_USER_001"; 
+                isAuthReady = true;
+                
+                // Detach any potential old listeners (good practice)
+                detachFirestoreListeners(); 
+                
+                // Attach listeners with the new SysAdmin userId
+                attachFirestoreListeners(); 
+                
+                // Show the main app
+                showMainApp();
+                
+            } else {
+                // Password is wrong
+                showMessage("Invalid admin password.", "error");
+                adminLoginForm.reset();
             }
         }
 
@@ -267,10 +300,26 @@
         }
 
         function renderStaff(staff) {
+            // Helper object for role colors
+            const roleColors = {
+                'Owner': 'bg-red-100 text-red-800',
+                'Manager': 'bg-blue-100 text-blue-800',
+                'Team Leader': 'bg-indigo-100 text-indigo-800',
+                'Cleaner': 'bg-green-100 text-green-800',
+                'SysAdmin': 'bg-gray-100 text-gray-800',
+                'default': 'bg-gray-100 text-gray-500'
+            };
+            
+            const colorClass = roleColors[staff.type] || roleColors['default'];
+            const typeName = staff.type || 'No Role';
+
             const el = document.createElement('div');
             el.className = 'bg-white p-4 rounded-lg shadow-md mb-3 flex justify-between items-center';
             el.innerHTML = `
-                <h4 class="font-bold text-gray-800">${staff.name}</h4>
+                <div>
+                    <h4 class="font-bold text-gray-800">${staff.name}</h4>
+                    <span class="text-xs font-semibold ${colorClass} px-2 py-0.5 rounded-full">${typeName}</span>
+                </div>
                 <button data-id="${staff.id}" class="delete-staff-btn text-red-500 hover:text-red-700 font-medium">
                     &times;
                 </button>
@@ -397,10 +446,11 @@
             e.preventDefault();
             if (!userId) return showMessage("You must be logged in.", "error");
             const name = addStaffForm.staffName.value;
-            if (!name) return showMessage("Please enter a staff name.", "error");
+            const type = addStaffForm.staffType.value; // Get the new role
+            if (!name || !type) return showMessage("Please enter name and select a role.", "error");
             try {
                 const staffRef = collection(db, 'artifacts', appId, 'users', userId, 'staff');
-                await addDoc(staffRef, { name });
+                await addDoc(staffRef, { name, type }); // Save name and type
                 showMessage("Staff member added!", "success");
                 addStaffForm.reset();
             } catch (error) { console.error("Error adding staff:", error); showMessage("Could not add staff member.", "error"); }
@@ -570,6 +620,7 @@
 
             // Get Auth buttons
             googleLoginBtn = document.getElementById('google-login-btn'); // New
+            adminLoginForm = document.getElementById('admin-login-form'); // New
 
             // Get forms
             addJobForm = document.getElementById('add-job-form');
@@ -602,6 +653,7 @@
             
             // Auth
             googleLoginBtn.addEventListener('click', handleGoogleLogin);
+            adminLoginForm.addEventListener('submit', handleAdminLogin); // New
             logoutBtn.addEventListener('click', handleLogout);
             
             // Forms
@@ -638,6 +690,25 @@
                 </svg>
                 <span>Sign in with Google</span>
             </button>
+
+            <!-- Divider -->
+            <div class="my-4 flex items-center justify-center">
+                <span class="border-b w-1/4"></span>
+                <span class="px-2 text-xs uppercase text-gray-500">Or</span>
+                <span class="border-b w-1/4"></span>
+            </div>
+
+            <!-- New SysAdmin Login Form -->
+            <form id="admin-login-form" class="space-y-3">
+                <div>
+                    <label for="admin-pass" class="block text-sm font-medium text-gray-700 text-left">SysAdmin Login</label>
+                    <input type="password" id="admin-pass" name="adminPass" placeholder="Enter password" class="mt-1 block w-full p-2 border border-gray-300 rounded-md shadow-sm focus:ring-emerald-500 focus:border-emerald-500">
+                </div>
+                <button type="submit" class="w-full bg-gray-700 text-white font-bold py-2 px-4 rounded-lg shadow-md hover:bg-gray-800 transition-colors">
+                    Login
+                </button>
+            </form>
+
         </div>
     </div>
 
@@ -790,6 +861,20 @@
                             <label for="staff-name" class="block text-sm font-medium text-gray-700">Staff Name</label>
                             <input type="text" id="staff-name" name="staffName" placeholder="e.g., Jane Smith" class="mt-1 block w-full p-2 border border-gray-300 rounded-md shadow-sm focus:ring-emerald-500 focus:border-emerald-500">
                         </div>
+                        
+                        <!-- New Staff Role Dropdown -->
+                        <div>
+                            <label for="staff-type" class="block text-sm font-medium text-gray-700">Staff Role</label>
+                            <select id="staff-type" name="staffType" class="mt-1 block w-full p-2 border border-gray-300 rounded-md shadow-sm focus:ring-emerald-500 focus:border-emerald-500">
+                                <option value="">Select Role</option>
+                                <option value="Owner">Owner</option>
+                                <option value="Manager">Manager</option>
+                                <option value="Team Leader">Team Leader</option>
+                                <option value="Cleaner">Cleaner</option>
+                                <option value="SysAdmin">SysAdmin</option>
+                            </select>
+                        </div>
+
                         <button type="submit" class="w-full bg-emerald-600 text-white font-bold py-3 px-4 rounded-lg shadow-md hover:bg-emerald-700 transition-colors">
                             Add Staff
                         </button>
@@ -878,6 +963,7 @@
     </div>
 </body>
 </html>
+
 
 
 
