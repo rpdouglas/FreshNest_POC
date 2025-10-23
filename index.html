@@ -1,0 +1,883 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Fresh Nest - Admin</title>
+    <!-- Load Tailwind CSS -->
+    <script src="https://cdn.tailwindcss.com"></script>
+    <!-- Load Firebase libraries -->
+    <script type="module">
+        // Firebase SDKs
+        import { initializeApp } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-app.js";
+        import { 
+            getAuth, 
+            onAuthStateChanged,
+            signInWithCustomToken,
+            GoogleAuthProvider, // New
+            signInWithPopup,    // New
+            signOut             // New
+        } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-auth.js";
+        import { 
+            getFirestore, 
+            doc, 
+            getDoc, 
+            setDoc, 
+            addDoc, 
+            updateDoc, 
+            deleteDoc, 
+            onSnapshot, 
+            collection, 
+            query, 
+            where, 
+            getDocs,
+            setLogLevel
+        } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-firestore.js";
+
+        // --- Firebase & App State ---
+        let app, db, auth;
+        let userId;
+        let isAuthReady = false;
+
+        // Firestore unsubscribe functions
+        let clientsUnsubscribe = null;
+        let staffUnsubscribe = null;
+        let jobsUnsubscribe = null;
+        let timesheetsUnsubscribe = null;
+
+        // Local cache of data for populating dropdowns
+        let clientsCache = [];
+        let staffCache = [];
+
+        // Get App ID from environment
+        const appId = typeof __app_id !== 'undefined' ? __app_id : 'default-fresh-nest-app';
+        
+        // --- DOM Elements ---
+        let scheduleSection, clientsSection, staffSection, timesheetsSection;
+        let scheduleBtn, clientsBtn, staffBtn, timesheetsBtn;
+        let addJobForm, addClientForm, addStaffForm, addTimeForm;
+        let jobsList, clientsList, staffList, timesheetsList;
+        let jobClientSelect, jobStaffSelect, timeStaffSelect;
+        let loadingSpinner, messageModal;
+        
+        // New Auth UI Elements
+        let loginSection, mainAppContainer, googleLoginBtn, logoutBtn;
+
+        // --- Firebase Initialization ---
+        async function initializeFirebase() {
+            try {
+                // User-provided Firebase config
+                const firebaseConfig = {
+                  apiKey: "AIzaSyC0vpYDeCNk0wYddQadw3kkzCfiVQQv8Bk",
+                  authDomain: "freshnest-aa51e.firebaseapp.com",
+                  projectId: "freshnest-aa51e",
+                  storageBucket: "freshnest-aa51e.firebasestorage.app",
+                  messagingSenderId: "521227407391",
+                  appId: "1:521227407391:web:c7d1886cf87a74434e452a",
+                  measurementId: "G-NHB0PXTDLK"
+                };
+
+                app = initializeApp(firebaseConfig);
+                db = getFirestore(app);
+                auth = getAuth(app);
+                
+                // Enable debug logging for Firestore
+                setLogLevel('Debug');
+
+                // Listen for auth state changes
+                onAuthStateChanged(auth, async (user) => {
+                    if (user) {
+                        // User is signed in (via Google, custom token, or session)
+                        console.log("User is signed in:", user.uid);
+                        userId = user.uid;
+                        isAuthReady = true;
+                        
+                        // Attach listeners and show the app
+                        attachFirestoreListeners();
+                        showMainApp();
+
+                    } else {
+                        // User is not signed in
+                        console.log("User is not signed in. Checking for custom token...");
+                        userId = null;
+                        isAuthReady = false;
+                        
+                        // Stop listening to any old data
+                        detachFirestoreListeners(); 
+
+                        // No user, so show the Google Login screen
+                        console.log("No custom token. Showing Google Login screen.");
+                        showLoginScreen();
+                    }
+                });
+            } catch (e) {
+                console.error("Error initializing Firebase:", e);
+                showMessage("Could not initialize app. Please check configuration.", "error");
+                showLoginScreen(); // Show login on init error
+            }
+        }
+
+        // --- New Auth Functions ---
+
+        async function handleGoogleLogin() {
+            const provider = new GoogleAuthProvider();
+            try {
+                showLoading(); // Show spinner during login
+                await signInWithPopup(auth, provider);
+                // On success, onAuthStateChanged will fire and handle showing the app.
+            } catch (error) {
+                console.error("Error during Google sign-in:", error);
+                showMessage("Could not sign in with Google. Please try again.", "error");
+                hideLoading(); // Hide spinner on error
+            }
+        }
+
+        async function handleLogout() {
+            try {
+                await signOut(auth);
+                // On success, onAuthStateChanged will fire, detect no user,
+                // and call showLoginScreen().
+            } catch (error) {
+                console.error("Error during sign-out:", error);
+                showMessage("Error signing out.", "error");
+            }
+        }
+
+        // --- Attach/Detach Listeners ---
+
+        function attachFirestoreListeners() {
+            if (!isAuthReady || !userId) {
+                console.warn("Auth not ready or no user ID. Listeners not attached.");
+                return;
+            }
+
+            // Ensure listeners aren't attached multiple times
+            if (clientsUnsubscribe) return;
+
+            console.log("Attaching Firestore listeners for user:", userId);
+
+            // 1. Listen for CLIENTS
+            const clientsRef = collection(db, 'artifacts', appId, 'users', userId, 'clients');
+            clientsUnsubscribe = onSnapshot(clientsRef, (snapshot) => {
+                clientsList.innerHTML = '';
+                jobClientSelect.innerHTML = '<option value="">Select a Client</option>';
+                clientsCache = []; // Clear cache
+                snapshot.docs.forEach(doc => {
+                    const client = { id: doc.id, ...doc.data() };
+                    clientsCache.push(client); // Add to cache
+                    renderClient(client);
+                    addClientToSelect(client);
+                });
+            }, (error) => console.error("Error listening to clients:", error));
+
+            // 2. Listen for STAFF
+            const staffRef = collection(db, 'artifacts', appId, 'users', userId, 'staff');
+            staffUnsubscribe = onSnapshot(staffRef, (snapshot) => {
+                staffList.innerHTML = '';
+                jobStaffSelect.innerHTML = '<option value="">Assign Staff</option>';
+                timeStaffSelect.innerHTML = '<option value="">Select Staff</option>';
+                staffCache = []; // Clear cache
+                snapshot.docs.forEach(doc => {
+                    const staff = { id: doc.id, ...doc.data() };
+                    staffCache.push(staff); // Add to cache
+                    renderStaff(staff);
+                    addStaffToSelect(staff);
+                    addStaffToTimeSelect(staff);
+                });
+            }, (error) => console.error("Error listening to staff:", error));
+
+            // 3. Listen for JOBS
+            const jobsRef = collection(db, 'artifacts', appId, 'users', userId, 'jobs');
+            jobsUnsubscribe = onSnapshot(jobsRef, (snapshot) => {
+                let jobs = [];
+                snapshot.docs.forEach(doc => {
+                    jobs.push({ id: doc.id, ...doc.data() });
+                });
+                
+                try {
+                    jobs.sort((a, b) => {
+                        const dateA = new Date(`${a.jobDate}T${a.jobTime || '00:00'}`);
+                        const dateB = new Date(`${b.jobDate}T${b.jobTime || '00:00'}`);
+                        return dateA - dateB;
+                    });
+                } catch (e) {
+                    console.error("Error sorting dates:", e);
+                }
+
+                jobsList.innerHTML = '';
+                jobs.forEach(job => renderJob(job));
+            }, (error) => console.error("Error listening to jobs:", error));
+
+            // 4. Listen for TIMESHEETS
+            const timesheetsRef = collection(db, 'artifacts', appId, 'users', userId, 'timesheets');
+            timesheetsUnsubscribe = onSnapshot(timesheetsRef, (snapshot) => {
+                let entries = [];
+                snapshot.docs.forEach(doc => {
+                    entries.push({ id: doc.id, ...doc.data() });
+                });
+
+                entries.sort((a, b) => new Date(b.date) - new Date(a.date)); // Newest first
+                timesheetsList.innerHTML = '';
+                entries.forEach(entry => renderTimeEntry(entry));
+
+            }, (error) => console.error("Error listening to timesheets:", error));
+        }
+
+        function detachFirestoreListeners() {
+            console.log("Detaching all Firestore listeners.");
+            if (clientsUnsubscribe) { clientsUnsubscribe(); clientsUnsubscribe = null; }
+            if (staffUnsubscribe) { staffUnsubscribe(); staffUnsubscribe = null; }
+            if (jobsUnsubscribe) { jobsUnsubscribe(); jobsUnsubscribe = null; }
+            if (timesheetsUnsubscribe) { timesheetsUnsubscribe(); timesheetsUnsubscribe = null; }
+
+            // Clear local caches
+            clientsCache = [];
+            staffCache = [];
+
+            // Clear UI lists
+            if (clientsList) clientsList.innerHTML = '';
+            if (staffList) staffList.innerHTML = '';
+            if (jobsList) jobsList.innerHTML = '';
+            if (timesheetsList) timesheetsList.innerHTML = '';
+            if (jobClientSelect) jobClientSelect.innerHTML = '<option value="">Select a Client</option>';
+            if (jobStaffSelect) jobStaffSelect.innerHTML = '<option value="">Assign Staff</option>';
+            if (timeStaffSelect) timeStaffSelect.innerHTML = '<option value="">Select Staff</option>';
+        }
+
+
+        // --- Render Functions (Unchanged) ---
+        // ... (All renderClient, renderStaff, renderJob, renderTimeEntry functions are identical) ...
+
+        function renderClient(client) {
+            const el = document.createElement('div');
+            el.className = 'bg-white p-4 rounded-lg shadow-md mb-3 flex justify-between items-center';
+            el.innerHTML = `
+                <div>
+                    <h4 class="font-bold text-gray-800">${client.name}</h4>
+                    <p class="text-sm text-gray-600">${client.phone}</p>
+                    <p class="text-sm text-gray-600">${client.address}</p>
+                    <span class="text-xs font-semibold ${client.type === 'commercial' ? 'bg-blue-100 text-blue-800' : 'bg-green-100 text-green-800'} px-2 py-0.5 rounded-full">${client.type}</span>
+                </div>
+                <button data-id="${client.id}" class="delete-client-btn text-red-500 hover:text-red-700 font-medium">
+                    &times;
+                </button>
+            `;
+            clientsList.appendChild(el);
+            el.querySelector('.delete-client-btn').addEventListener('click', () => deleteClient(client.id));
+        }
+
+        function renderStaff(staff) {
+            const el = document.createElement('div');
+            el.className = 'bg-white p-4 rounded-lg shadow-md mb-3 flex justify-between items-center';
+            el.innerHTML = `
+                <h4 class="font-bold text-gray-800">${staff.name}</h4>
+                <button data-id="${staff.id}" class="delete-staff-btn text-red-500 hover:text-red-700 font-medium">
+                    &times;
+                </button>
+            `;
+            staffList.appendChild(el);
+            el.querySelector('.delete-staff-btn').addEventListener('click', () => deleteStaff(staff.id));
+        }
+
+        function renderJob(job) {
+            const client = clientsCache.find(c => c.id === job.clientId);
+            const staff = staffCache.find(s => s.id === job.staffId);
+            const clientName = client ? client.name : 'Unknown Client';
+            const staffName = staff ? staff.name : 'Unassigned';
+            const isCompleted = job.status === 'completed';
+            const jobDate = new Date(`${job.jobDate}T${job.jobTime || '00:00'}`);
+            
+            const formattedDate = jobDate.toLocaleDateString(undefined, {
+                weekday: 'short', month: 'short', day: 'numeric'
+            });
+            const formattedTime = jobDate.toLocaleTimeString(undefined, {
+                hour: '2-digit', minute: '2-digit'
+            });
+
+            const el = document.createElement('div');
+            el.className = `bg-white p-4 rounded-lg shadow-md mb-3 border-l-4 ${isCompleted ? 'border-gray-400 opacity-70' : 'border-emerald-500'}`;
+            el.innerHTML = `
+                <div class="flex justify-between items-start">
+                    <div>
+                        <h4 class="font-bold text-lg ${isCompleted ? 'text-gray-600 line-through' : 'text-emerald-800'}">${clientName}</h4>
+                        <p class="text-sm text-gray-700">${job.serviceType}</p>
+                        <p class="text-sm text-gray-600 font-medium">${formattedDate} at ${formattedTime}</p>
+                        <p class="text-sm text-gray-600">with: ${staffName}</p>
+                    </div>
+                    <button data-id="${job.id}" class="delete-job-btn text-red-500 hover:text-red-700 font-medium text-lg">
+                        &times;
+                    </button>
+                </div>
+                <div class="mt-3 pt-3 border-t">
+                    <button data-id="${job.id}" data-status="${job.status}" class="toggle-job-status-btn w-full text-sm font-semibold py-2 px-3 rounded-lg ${isCompleted ? 'bg-gray-200 text-gray-700 hover:bg-gray-300' : 'bg-emerald-100 text-emerald-700 hover:bg-emerald-200'}">
+                        ${isCompleted ? 'Mark as Pending' : 'Mark as Completed'}
+                    </button>
+                </div>
+            `;
+            jobsList.appendChild(el);
+            el.querySelector('.delete-job-btn').addEventListener('click', () => deleteJob(job.id));
+            el.querySelector('.toggle-job-status-btn').addEventListener('click', () => toggleJobStatus(job.id, job.status));
+        }
+
+        function renderTimeEntry(entry) {
+            const staff = staffCache.find(s => s.id === entry.staffId);
+            const staffName = staff ? staff.name : 'Unknown Staff';
+            let displayDate = entry.date;
+            try {
+                const [year, month, day] = entry.date.split('-');
+                displayDate = new Date(year, month - 1, day).toLocaleDateString(undefined, {
+                    month: 'short',
+                    day: 'numeric',
+                    year: 'numeric'
+                });
+            } catch (e) {
+                console.warn("Could not parse date:", entry.date);
+            }
+
+            const tr = document.createElement('tr');
+            tr.innerHTML = `
+                <td class="p-3 whitespace-nowrap text-sm text-gray-700">${staffName}</td>
+                <td class="p-3 whitespace-nowrap text-sm text-gray-700">${displayDate}</td>
+                <td class="p-3 whitespace-nowrap text-sm text-gray-700">${entry.hours}</td>
+                <td class="p-3 whitespace-nowrap text-sm text-gray-700">${entry.notes || ''}</td>
+                <td class="p-3 whitespace-nowrap text-sm text-right">
+                    <button data-id="${entry.id}" class="delete-time-btn text-red-500 hover:text-red-700">&times;</button>
+                </td>
+            `;
+            timesheetsList.appendChild(tr);
+            tr.querySelector('.delete-time-btn').addEventListener('click', () => deleteTimeEntry(entry.id));
+        }
+
+        // --- Helper functions (Unchanged) ---
+        // ... (addClientToSelect, addStaffToSelect, addStaffToTimeSelect are identical) ...
+        
+        function addClientToSelect(client) {
+            const option = document.createElement('option');
+            option.value = client.id;
+            option.textContent = `${client.name} (${client.type})`;
+            jobClientSelect.appendChild(option);
+        }
+
+        function addStaffToSelect(staff) {
+            const option = document.createElement('option');
+            option.value = staff.id;
+            option.textContent = staff.name;
+            jobStaffSelect.appendChild(option);
+        }
+
+        function addStaffToTimeSelect(staff) {
+            const option = document.createElement('option');
+            option.value = staff.id;
+            option.textContent = staff.name;
+            timeStaffSelect.appendChild(option);
+        }
+
+
+        // --- Firestore C(R)UD Functions (Unchanged, but now secure) ---
+        // ... (All handleAdd..., delete..., and toggle... functions are identical) ...
+        // ... (They inherently use the global `userId` which is now set by auth) ...
+
+        async function handleAddClient(e) {
+            e.preventDefault();
+            if (!userId) return showMessage("You must be logged in.", "error");
+            const name = addClientForm.clientName.value;
+            const phone = addClientForm.clientPhone.value;
+            const address = addClientForm.clientAddress.value;
+            const type = addClientForm.clientType.value;
+            if (!name || !phone || !address) return showMessage("Please fill out all client fields.", "error");
+            try {
+                const clientsRef = collection(db, 'artifacts', appId, 'users', userId, 'clients');
+                await addDoc(clientsRef, { name, phone, address, type });
+                showMessage("Client added successfully!", "success");
+                addClientForm.reset();
+            } catch (error) { console.error("Error adding client:", error); showMessage("Could not add client.", "error"); }
+        }
+        
+        async function handleAddStaff(e) {
+            e.preventDefault();
+            if (!userId) return showMessage("You must be logged in.", "error");
+            const name = addStaffForm.staffName.value;
+            if (!name) return showMessage("Please enter a staff name.", "error");
+            try {
+                const staffRef = collection(db, 'artifacts', appId, 'users', userId, 'staff');
+                await addDoc(staffRef, { name });
+                showMessage("Staff member added!", "success");
+                addStaffForm.reset();
+            } catch (error) { console.error("Error adding staff:", error); showMessage("Could not add staff member.", "error"); }
+        }
+        
+        async function handleAddJob(e) {
+            e.preventDefault();
+            if (!userId) return showMessage("You must be logged in.", "error");
+            const clientId = addJobForm.jobClient.value;
+            const serviceType = addJobForm.jobService.value;
+            const jobDate = addJobForm.jobDate.value;
+            const jobTime = addJobForm.jobTime.value;
+            const staffId = addJobForm.jobStaff.value;
+            if (!clientId || !serviceType || !jobDate || !jobTime || !staffId) return showMessage("Please fill out all job fields.", "error");
+            try {
+                const jobsRef = collection(db, 'artifacts', appId, 'users', userId, 'jobs');
+                await addDoc(jobsRef, { clientId, serviceType, jobDate, jobTime, staffId, status: 'pending' });
+                showMessage("Job booked successfully!", "success");
+                addJobForm.reset();
+            } catch (error) { console.error("Error adding job:", error); showMessage("Could not book job.", "error"); }
+        }
+
+        async function handleAddTimeEntry(e) {
+            e.preventDefault();
+            if (!userId) return showMessage("You must be logged in.", "error");
+            const staffId = addTimeForm.timeStaff.value;
+            const date = addTimeForm.timeDate.value;
+            const hours = parseFloat(addTimeForm.timeHours.value);
+            const notes = addTimeForm.timeNotes.value;
+            if (!staffId || !date || !hours) return showMessage("Please select staff, date, and hours.", "error");
+            if (isNaN(hours) || hours <= 0) return showMessage("Please enter valid hours.", "error");
+            try {
+                const timesheetsRef = collection(db, 'artifacts', appId, 'users', userId, 'timesheets');
+                await addDoc(timesheetsRef, { staffId, date, hours, notes });
+                showMessage("Time entry logged!", "success");
+                addTimeForm.reset();
+            } catch (error) { console.error("Error logging time:", error); showMessage("Could not log time.", "error"); }
+        }
+
+        async function deleteClient(id) {
+            if (!userId) return;
+            try {
+                const docRef = doc(db, 'artifacts', appId, 'users', userId, 'clients', id);
+                await deleteDoc(docRef);
+                showMessage("Client deleted.", "success");
+            } catch (error) { console.error("Error deleting client:", error); showMessage("Could not delete client.", "error"); }
+        }
+        
+        async function deleteStaff(id) {
+            if (!userId) return;
+            try {
+                const docRef = doc(db, 'artifacts', appId, 'users', userId, 'staff', id);
+                await deleteDoc(docRef);
+                showMessage("Staff member deleted.", "success");
+            } catch (error) { console.error("Error deleting staff:", error); showMessage("Could not delete staff member.", "error"); }
+        }
+
+        async function deleteJob(id) {
+            if (!userId) return;
+            try {
+                const docRef = doc(db, 'artifacts', appId, 'users', userId, 'jobs', id);
+                await deleteDoc(docRef);
+                showMessage("Job deleted.", "success");
+            } catch (error) { console.error("Error deleting job:", error); showMessage("Could not delete job.", "error"); }
+        }
+        
+        async function toggleJobStatus(id, currentStatus) {
+            if (!userId) return;
+            const newStatus = currentStatus === 'pending' ? 'completed' : 'pending';
+            try {
+                const docRef = doc(db, 'artifacts', appId, 'users', userId, 'jobs', id);
+                await updateDoc(docRef, { status: newStatus });
+                showMessage("Job status updated.", "success");
+            } catch (error) { console.error("Error updating job status:", error); showMessage("Could not update job status.", "error"); }
+        }
+
+        async function deleteTimeEntry(id) {
+            if (!userId) return;
+            try {
+                const docRef = doc(db, 'artifacts', appId, 'users', userId, 'timesheets', id);
+                await deleteDoc(docRef);
+                showMessage("Time entry deleted.", "success");
+            } catch (error) { console.error("Error deleting time entry:", error); showMessage("Could not delete time entry.", "error"); }
+        }
+
+
+        // --- UI Navigation ---
+        function showSection(sectionId) {
+            // Hide all sections
+            [scheduleSection, clientsSection, staffSection, timesheetsSection].forEach(sec => sec.classList.add('hidden'));
+            // Deactivate all buttons
+            [scheduleBtn, clientsBtn, staffBtn, timesheetsBtn].forEach(btn => btn.classList.remove('bg-emerald-600', 'text-white'));
+            
+            // Show target section and activate button
+            if (sectionId === 'schedule') {
+                scheduleSection.classList.remove('hidden');
+                scheduleBtn.classList.add('bg-emerald-600', 'text-white');
+            } else if (sectionId === 'clients') {
+                clientsSection.classList.remove('hidden');
+                clientsBtn.classList.add('bg-emerald-600', 'text-white');
+            } else if (sectionId === 'staff') {
+                staffSection.classList.remove('hidden');
+                staffBtn.classList.add('bg-emerald-600', 'text-white');
+            } else if (sectionId === 'timesheets') { 
+                timesheetsSection.classList.remove('hidden');
+                timesheetsBtn.classList.add('bg-emerald-600', 'text-white');
+            }
+        }
+
+        // --- UI Helpers ---
+        function showLoading() {
+            loadingSpinner.classList.remove('hidden');
+        }
+        
+        function hideLoading() {
+            loadingSpinner.classList.add('hidden');
+        }
+
+        // New UI state functions
+        function showMainApp() {
+            mainAppContainer.classList.remove('hidden');
+            loginSection.classList.add('hidden');
+            hideLoading();
+            showSection('schedule'); // Show default section
+        }
+        
+        function showLoginScreen() {
+            mainAppContainer.classList.add('hidden');
+            loginSection.classList.remove('hidden');
+            hideLoading();
+        }
+
+
+        function showMessage(message, type = 'success') {
+            messageModal.textContent = message;
+            if (type === 'error') {
+                messageModal.classList.remove('bg-green-500');
+                messageModal.classList.add('bg-red-500');
+            } else {
+                messageModal.classList.remove('bg-red-500');
+                messageModal.classList.add('bg-green-500');
+            }
+            messageModal.classList.remove('translate-y-full');
+            setTimeout(() => {
+                messageModal.classList.add('translate-y-full');
+            }, 3000);
+        }
+
+        // --- DOMContentLoaded ---
+        document.addEventListener('DOMContentLoaded', () => {
+            // Get main containers
+            loginSection = document.getElementById('login-section');
+            mainAppContainer = document.getElementById('main-app-container');
+
+            // Get section elements
+            scheduleSection = document.getElementById('schedule-section');
+            clientsSection = document.getElementById('clients-section');
+            staffSection = document.getElementById('staff-section');
+            timesheetsSection = document.getElementById('timesheets-section');
+            
+            // Get nav buttons
+            scheduleBtn = document.getElementById('schedule-btn');
+            clientsBtn = document.getElementById('clients-btn');
+            staffBtn = document.getElementById('staff-btn');
+            timesheetsBtn = document.getElementById('timesheets-btn');
+            logoutBtn = document.getElementById('logout-btn'); // New
+
+            // Get Auth buttons
+            googleLoginBtn = document.getElementById('google-login-btn'); // New
+
+            // Get forms
+            addJobForm = document.getElementById('add-job-form');
+            addClientForm = document.getElementById('add-client-form');
+            addStaffForm = document.getElementById('add-staff-form');
+            addTimeForm = document.getElementById('add-time-form');
+
+            // Get lists
+            jobsList = document.getElementById('jobs-list');
+            clientsList = document.getElementById('clients-list');
+            staffList = document.getElementById('staff-list');
+            timesheetsList = document.getElementById('timesheets-list');
+
+            // Get job form dropdowns
+            jobClientSelect = document.getElementById('job-client');
+            jobStaffSelect = document.getElementById('job-staff');
+            timeStaffSelect = document.getElementById('time-staff');
+
+            // Get UI helpers
+            loadingSpinner = document.getElementById('loading-spinner');
+            messageModal = document.getElementById('message-modal');
+
+            // --- Attach Event Listeners ---
+
+            // Navigation
+            scheduleBtn.addEventListener('click', () => showSection('schedule'));
+            clientsBtn.addEventListener('click', () => showSection('clients'));
+            staffBtn.addEventListener('click', () => showSection('staff'));
+            timesheetsBtn.addEventListener('click', () => showSection('timesheets'));
+            
+            // Auth
+            googleLoginBtn.addEventListener('click', handleGoogleLogin);
+            logoutBtn.addEventListener('click', handleLogout);
+            
+            // Forms
+            addJobForm.addEventListener('submit', handleAddJob);
+            addClientForm.addEventListener('submit', handleAddClient);
+            addStaffForm.addEventListener('submit', handleAddStaff);
+            addTimeForm.addEventListener('submit', handleAddTimeEntry);
+
+            // --- Initial State ---
+            showLoading(); // Show spinner until auth state is determined
+            initializeFirebase();
+        });
+
+    </script>
+</head>
+<body class="bg-gray-100 font-sans" style="font-family: 'Inter', sans-serif;">
+
+    <!-- ======================= -->
+    <!-- === LOGIN SECTION === -->
+    <!-- ======================= -->
+    <div id="login-section" class="hidden fixed inset-0 flex items-center justify-center bg-gray-100 z-30">
+        <div class="max-w-sm w-full bg-white p-8 rounded-lg shadow-xl text-center">
+            <h1 class="text-3xl font-bold text-emerald-600">Fresh Nest</h1>
+            <p class="text-gray-600 mb-8 mt-1">Cleaning Co. Management</p>
+            
+            <button id="google-login-btn" class="w-full bg-white border border-gray-300 text-gray-700 font-semibold py-3 px-4 rounded-lg shadow-sm hover:bg-gray-50 transition-colors flex items-center justify-center space-x-2">
+                <!-- Google SVG Icon -->
+                <svg class="w-5 h-5" viewBox="0 0 48 48" xmlns="http://www.w3.org/2000/svg">
+                    <path fill="#4285F4" d="M24 9.5c3.54 0 6.71 1.22 9.21 3.6l6.85-6.85C35.9 2.38 30.47 0 24 0 14.62 0 6.51 5.38 2.56 13.22l8.28 6.43A11.96 11.96 0 0 1 24 9.5z"/>
+                    <path fill="#34A853" d="M46.98 24.55c0-1.57-.15-3.09-.42-4.55H24v9.02h12.94c-.58 2.96-2.26 5.48-4.78 7.18l7.73 6c4.51-4.18 7.09-10.36 7.09-17.65z"/>
+                    <path fill="#FBBC05" d="M10.84 28.19A11.96 11.96 0 0 1 9.5 24c0-1.45.25-2.85.7-4.19l-8.28-6.43C.73 16.15 0 20 0 24s.73 7.85 1.96 11.19l8.88-7z"/>
+                    <path fill="#EA4335" d="M24 48c6.48 0 11.93-2.13 15.89-5.81l-7.73-6c-2.15 1.45-4.92 2.3-8.16 2.3-6.26 0-11.57-4.22-13.47-9.91l-8.28 6.43C6.51 42.62 14.62 48 24 48z"/>
+                    <path fill="none" d="M0 0h48v48H0z"/>
+                </svg>
+                <span>Sign in with Google</span>
+            </button>
+        </div>
+    </div>
+
+
+    <!-- ======================== -->
+    <!-- === MAIN APP SECTION === -->
+    <!-- ======================== -->
+    <!-- Main Container (now hidden by default) -->
+    <div id="main-app-container" class="hidden max-w-3xl mx-auto min-h-screen bg-gray-100 pb-24">
+        
+        <!-- Header -->
+        <header class="bg-emerald-600 text-white p-5 shadow-lg relative">
+            <h1 class="text-3xl font-bold text-center">Fresh Nest</h1>
+            <p class="text-center text-emerald-100 text-sm">Cleaning Co. Management</p>
+            
+            <!-- Logout Button -->
+            <button id="logout-btn" class="absolute top-4 right-4 sm:top-5 sm:right-5 bg-white text-emerald-700 text-sm font-semibold px-3 py-1 rounded-md shadow hover:bg-emerald-50 transition-colors">
+                Logout
+            </button>
+        </header>
+
+        <!-- Navigation -->
+        <nav class="sticky top-0 z-10 bg-white shadow-md">
+            <div class="flex justify-around">
+                <button id="schedule-btn" class="flex-1 py-3 px-4 font-semibold text-emerald-700 hover:bg-emerald-50 transition-colors text-sm sm:text-base">
+                    Schedule
+                </button>
+                <button id="clients-btn" class="flex-1 py-3 px-4 font-semibold text-emerald-700 hover:bg-emerald-50 transition-colors border-l border-gray-200 text-sm sm:text-base">
+                    Clients
+                </button>
+                <button id="staff-btn" class="flex-1 py-3 px-4 font-semibold text-emerald-700 hover:bg-emerald-50 transition-colors border-l border-gray-200 text-sm sm:text-base">
+                    Staff
+                </button>
+                <button id="timesheets-btn" class="flex-1 py-3 px-4 font-semibold text-emerald-700 hover:bg-emerald-50 transition-colors border-l border-gray-200 text-sm sm:text-base">
+                    Timesheets
+                </button>
+            </div>
+        </nav>
+
+        <!-- Content Area -->
+        <main class="p-4">
+
+            <!-- ======================= -->
+            <!-- === SCHEDULE SECTION === -->
+            <!-- ======================= -->
+            <section id="schedule-section">
+                <!-- Book New Job Form -->
+                <div class="bg-white p-5 rounded-lg shadow-lg mb-6">
+                    <h2 class="text-xl font-bold text-emerald-800 mb-4">Book New Job</h2>
+                    <form id="add-job-form" class="space-y-4">
+                        <div>
+                            <label for="job-client" class="block text-sm font-medium text-gray-700">Client</label>
+                            <select id="job-client" name="jobClient" class="mt-1 block w-full p-2 border border-gray-300 rounded-md shadow-sm focus:ring-emerald-500 focus:border-emerald-500"></select>
+                        </div>
+                        
+                        <div>
+                            <label for="job-service" class="block text-sm font-medium text-gray-700">Service Type</label>
+                            <select id="job-service" name="jobService" class="mt-1 block w-full p-2 border border-gray-300 rounded-md shadow-sm focus:ring-emerald-500 focus:border-emerald-500">
+                                <option value="">Select Service</option>
+                                <option value="Residential - Standard">Residential - Standard</option>
+                                <option value="Residential - Deep Clean">Residential - Deep Clean</option>
+                                <option value="Residential - Move In/Out">Residential - Move In/Out</option>
+                                <option value="Commercial - Office">Commercial - Office</option>
+                                <option value="Commercial - Retail">Commercial - Retail</option>
+                            </select>
+                        </div>
+
+                        <div class="grid grid-cols-2 gap-4">
+                            <div>
+                                <label for="job-date" class="block text-sm font-medium text-gray-700">Date</label>
+                                <input type="date" id="job-date" name="jobDate" class="mt-1 block w-full p-2 border border-gray-300 rounded-md shadow-sm focus:ring-emerald-500 focus:border-emerald-500">
+                            </div>
+                            <div>
+                                <label for="job-time" class="block text-sm font-medium text-gray-700">Time</label>
+                                <input type="time" id="job-time" name="jobTime" class="mt-1 block w-full p-2 border border-gray-300 rounded-md shadow-sm focus:ring-emerald-500 focus:border-emerald-500">
+                            </div>
+                        </div>
+
+                        <div>
+                            <label for="job-staff" class="block text-sm font-medium text-gray-700">Assign Staff</label>
+                            <select id="job-staff" name="jobStaff" class="mt-1 block w-full p-2 border border-gray-300 rounded-md shadow-sm focus:ring-emerald-500 focus:border-emerald-500"></select>
+                        </div>
+
+                        <button type="submit" class="w-full bg-emerald-600 text-white font-bold py-3 px-4 rounded-lg shadow-md hover:bg-emerald-700 transition-colors">
+                            Book Job
+                        </button>
+                    </form>
+                </div>
+
+                <!-- Upcoming Jobs List -->
+                <div>
+                    <h2 class="text-xl font-bold text-emerald-800 mb-4">Upcoming Jobs</h2>
+                    <div id="jobs-list" class="space-y-3">
+                        <!-- Jobs will be rendered here by JS -->
+                    </div>
+                </div>
+            </section>
+
+            <!-- ===================== -->
+            <!-- === CLIENTS SECTION === -->
+            <!-- ===================== -->
+            <section id="clients-section" class="hidden">
+                <!-- Add New Client Form -->
+                <div class="bg-white p-5 rounded-lg shadow-lg mb-6">
+                    <h2 class="text-xl font-bold text-emerald-800 mb-4">Add New Client</h2>
+                    <form id="add-client-form" class="space-y-4">
+                        <div>
+                            <label for="client-name" class="block text-sm font-medium text-gray-700">Client Name</label>
+                            <input type="text" id="client-name" name="clientName" placeholder="e.g., John Doe" class="mt-1 block w-full p-2 border border-gray-300 rounded-md shadow-sm focus:ring-emerald-500 focus:border-emerald-500">
+                        </div>
+                        <div>
+                            <label for="client-phone" class="block text-sm font-medium text-gray-700">Phone</label>
+                            <input type="tel" id="client-phone" name="clientPhone" placeholder="e.g., (555) 123-4567" class="mt-1 block w-full p-2 border border-gray-300 rounded-md shadow-sm focus:ring-emerald-500 focus:border-emerald-500">
+                        </div>
+                        <div>
+                            <label for="client-address" class="block text-sm font-medium text-gray-700">Address</label>
+                            <input type="text" id="client-address" name="clientAddress" placeholder="e.g., 123 Main St" class="mt-1 block w-full p-2 border border-gray-300 rounded-md shadow-sm focus:ring-emerald-500 focus:border-emerald-500">
+                        </div>
+                        <div>
+                            <label for="client-type" class="block text-sm font-medium text-gray-700">Client Type</label>
+                            <select id="client-type" name="clientType" class="mt-1 block w-full p-2 border border-gray-300 rounded-md shadow-sm focus:ring-emerald-500 focus:border-emerald-500">
+                                <option value="residential">Residential</option>
+                                <option value="commercial">Commercial</option>
+                            </select>
+                        </div>
+                        <button type="submit" class="w-full bg-emerald-600 text-white font-bold py-3 px-4 rounded-lg shadow-md hover:bg-emerald-700 transition-colors">
+                            Add Client
+                        </button>
+                    </form>
+                </div>
+                
+                <!-- Client List -->
+                <div>
+                    <h2 class="text-xl font-bold text-emerald-800 mb-4">My Clients</h2>
+                    <div id="clients-list" class="space-y-3">
+                        <!-- Clients will be rendered here by JS -->
+                    </div>
+                </div>
+            </section>
+
+            <!-- =================== -->
+            <!-- === STAFF SECTION === -->
+            <!-- =================== -->
+            <section id="staff-section" class="hidden">
+                <!-- Add New Staff Form -->
+                <div class="bg-white p-5 rounded-lg shadow-lg mb-6">
+                    <h2 class="text-xl font-bold text-emerald-800 mb-4">Add New Staff Member</h2>
+                    <form id="add-staff-form" class="space-y-4">
+                        <div>
+                            <label for="staff-name" class="block text-sm font-medium text-gray-700">Staff Name</label>
+                            <input type="text" id="staff-name" name="staffName" placeholder="e.g., Jane Smith" class="mt-1 block w-full p-2 border border-gray-300 rounded-md shadow-sm focus:ring-emerald-500 focus:border-emerald-500">
+                        </div>
+                        <button type="submit" class="w-full bg-emerald-600 text-white font-bold py-3 px-4 rounded-lg shadow-md hover:bg-emerald-700 transition-colors">
+                            Add Staff
+                        </button>
+                    </form>
+                </div>
+
+                <!-- Staff List -->
+                <div>
+                    <h2 class="text-xl font-bold text-emerald-800 mb-4">My Team</h2>
+                    <div id="staff-list" class="space-y-3">
+                        <!-- Staff will be rendered here by JS -->
+                    </div>
+                </div>
+            </section>
+
+            <!-- ========================= -->
+            <!-- === TIMESHEETS SECTION === -->
+            <!-- ========================= -->
+            <section id="timesheets-section" class="hidden">
+                <!-- Log Time Form -->
+                <div class="bg-white p-5 rounded-lg shadow-lg mb-6">
+                    <h2 class="text-xl font-bold text-emerald-800 mb-4">Log Staff Hours</h2>
+                    <form id="add-time-form" class="space-y-4">
+                        <div>
+                            <label for="time-staff" class="block text-sm font-medium text-gray-700">Staff Member</label>
+                            <select id="time-staff" name="timeStaff" class="mt-1 block w-full p-2 border border-gray-300 rounded-md shadow-sm focus:ring-emerald-500 focus:border-emerald-500"></select>
+                        </div>
+                        
+                        <div class="grid grid-cols-2 gap-4">
+                            <div>
+                                <label for="time-date" class="block text-sm font-medium text-gray-700">Date</label>
+                                <input type="date" id="time-date" name="timeDate" class="mt-1 block w-full p-2 border border-gray-300 rounded-md shadow-sm focus:ring-emerald-500 focus:border-emerald-500">
+                            </div>
+                            <div>
+                                <label for="time-hours" class="block text-sm font-medium text-gray-700">Hours</label>
+                                <input type="number" id="time-hours" name="timeHours" min="0" step="0.25" placeholder="e.g., 8.5" class="mt-1 block w-full p-2 border border-gray-300 rounded-md shadow-sm focus:ring-emerald-500 focus:border-emerald-500">
+                            </div>
+                        </div>
+
+                        <div>
+                            <label for="time-notes" class="block text-sm font-medium text-gray-700">Notes (Optional)</label>
+                            <input type="text" id="time-notes" name="timeNotes" placeholder="e.g., Deep clean at 123 Main" class="mt-1 block w-full p-2 border border-gray-300 rounded-md shadow-sm focus:ring-emerald-500 focus:border-emerald-500">
+                        </div>
+
+                        <button type="submit" class="w-full bg-emerald-600 text-white font-bold py-3 px-4 rounded-lg shadow-md hover:bg-emerald-700 transition-colors">
+                            Log Hours
+                        </button>
+                    </form>
+                </div>
+
+                <!-- Logged Hours List (Spreadsheet View) -->
+                <div>
+                    <h2 class="text-xl font-bold text-emerald-800 mb-4">Logged Hours</h2>
+                    <div class="overflow-x-auto shadow-md rounded-lg">
+                        <table class="min-w-full bg-white">
+                            <thead class="bg-gray-50">
+                                <tr>
+                                    <th scope="col" class="p-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Staff</th>
+                                    <th scope="col" class="p-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Date</th>
+                                    <th scope="col" class="p-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Hours</th>
+                                    <th scope="col" class="p-3 text-left text-xs font-m"text-gray-500 uppercase tracking-wider">Notes</th>
+                                    <th scope="col" class="p-3 text-right text-xs font-medium text-gray-500 uppercase tracking-wider">Action</th>
+                                </tr>
+                            </thead>
+                            <tbody id="timesheets-list" class="divide-y divide-gray-200">
+                                <!-- Timesheet entries will be rendered here by JS -->
+                            </tbody>
+                        </table>
+                    </div>
+                </div>
+            </section>
+        </main>
+    </div>
+
+    <!-- ================== -->
+    <!-- === UI HELPERS === -->
+    <!-- ================== -->
+    <!-- Loading Spinner (Visible by default, hidden by JS) -->
+    <div id="loading-spinner" class="fixed inset-0 bg-black bg-opacity-50 flex justify-center items-center z-50">
+        <div class="animate-spin rounded-full h-16 w-16 border-t-4 border-b-4 border-emerald-400"></div>
+    </div>
+    
+    <!-- Message Modal -->
+    <div id="message-modal" class="fixed bottom-0 left-0 right-0 p-4 text-white text-center transform translate-y-full transition-transform duration-300 z-40">
+        <!-- Message content set by JS -->
+    </div>
+</body>
+</html>
+
+
+
