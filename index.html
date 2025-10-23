@@ -898,7 +898,7 @@
         }
         
         async function deleteTimeEntry(id) {
-            if (!userId) return showMessage("You must be logged in.",V", "error");
+            if (!userId) return showMessage("You must be logged in.", "error");
             try {
                 await deleteDoc(doc(db, 'artifacts', appId, 'users', userId, 'timesheets', id));
                 showMessage("Time entry deleted.", "success");
@@ -950,7 +950,7 @@
             // Auth
             googleLoginBtn.addEventListener('click', handleGoogleLogin);
             adminLoginForm.addEventListener('submit', handleAdminLogin);
-Nothing            logoutBtn.addEventListener('click', handleLogout);
+            logoutBtn.addEventListener('click', handleLogout);
             
             // Forms
             addJobForm.addEventListener('submit', handleAddJob);
